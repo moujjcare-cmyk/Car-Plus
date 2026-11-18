@@ -26,9 +26,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Cordova WebView Wrapper Project
+      - name: Create Cordova Wrapper & Build APK
         run: |
-          npm install -g cordova
+          npm install -g cordova@12.0.0
           cordova create autohub_apk com.asifilyas.autohubpro "AutoHub PRO"
           cd autohub_apk
           rm -rf www/*
@@ -37,7 +37,7 @@ jobs:
           cp ../sw.js www/ || true
           cp ../icon-192.png www/ || true
           cp ../icon-512.png www/ || true
-          cordova platform add android
+          cordova platform add android --nosave
           cordova build android --debug
 
       - name: Upload Ready-to-Install APK Artifact
