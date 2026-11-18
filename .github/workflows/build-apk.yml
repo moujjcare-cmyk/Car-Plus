@@ -23,11 +23,31 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Download & Setup Android SDK Commandline Tools
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+          unzip -q tools.zip
+          mkdir -p latest
+          mv cmdline-tools/* latest/ 2>/dev/null || true
+          rm -rf tools.zip cmdline-tools
+
+      - name: Configure Android SDK Environment & Licenses
+        run: |
+          echo "export ANDROID_HOME=$HOME/android-sdk" >> $HOME/.bashrc
+          echo "export PATH=\$PATH:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools" >> $HOME/.bashrc
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Create Cordova Wrapper & Build APK
         run: |
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          
           npm install -g cordova@12.0.0
           cordova create autohub_apk com.asifilyas.autohubpro "AutoHub PRO"
           cd autohub_apk
