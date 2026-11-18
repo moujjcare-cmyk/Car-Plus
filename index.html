@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AutoHub PRO - Smart Garage Suite</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b1120">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HEIC to JPEG Converter Library for OnePlus / iPhone Camera Photos -->
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        navy: { 950: '#070b14', 900: '#0b1120', 800: '#111a2e', 700: '#1a2642' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background-color: #070b14;
+            color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-card {
+            background: rgba(17, 26, 46, 0.86);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.16);
+        }
+        html:not(.dark) body {
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        html:not(.dark) .glass-card {
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .hero-card {
+            background: linear-gradient(135deg, rgba(15, 28, 53, 0.96) 0%, rgba(11, 20, 38, 0.94) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.24);
+        }
+        html:not(.dark) .hero-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+        }
+        .pill-active {
+            background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%) !important;
+            color: #ffffff !important;
+            border-color: #38bdf8 !important;
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+        }
+        .zone-active {
+            background: linear-gradient(135deg, #ea580c 0%, #f97316 100%) !important;
+            color: #ffffff !important;
+            border-color: #fb923c !important;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+        }
+        .light-active {
+            border-color: #38bdf8 !important;
+            background: rgba(14, 165, 233, 0.16) !important;
+            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.45);
+        }
+        .car-watermark {
+            position: fixed;
+            bottom: 70px;
+            right: -30px;
+            width: 320px;
+            height: 200px;
+            opacity: 0.04;
+            pointer-events: none;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body class="bg-[#070b14] text-slate-100 min-h-screen pb-28 transition-colors duration-200 relative overflow-x-hidden">
+
+    <!-- Hidden File Inputs (Separate Camera & Gallery for every section) -->
+    <!-- 1. Hero Car Photo -->
+    <input type="file" id="input-car-cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoInput(event, 'car')">
+    <input type="file" id="input-car-gal" accept="image/*,.heic,.heif" style="display:none" onchange="handlePhotoInput(event, 'car')">
+    <!-- 2. Maintenance / Receipt Photo -->
+    <input type="file" id="input-log-cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoInput(event, 'log')">
+    <input type="file" id="input-log-gal" accept="image/*,.heic,.heif" style="display:none" onchange="handlePhotoInput(event, 'log')">
+    <!-- 3. Dent Photo -->
+    <input type="file" id="input-dent-cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoInput(event, 'dent')">
+    <input type="file" id="input-dent-gal" accept="image/*,.heic,.heif" style="display:none" onchange="handlePhotoInput(event, 'dent')">
+    <!-- 4. Fuel Meter / Receipt Photo -->
+    <input type="file" id="input-fuel-cam" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoInput(event, 'fuel')">
+    <input type="file" id="input-fuel-gal" accept="image/*,.heic,.heif" style="display:none" onchange="handlePhotoInput(event, 'fuel')">
+    <!-- 5. Restore JSON File -->
+    <input type="file" id="input-restore-json" accept=".json,application/json" style="display:none" onchange="importDatabaseJSON(event)">
+
+    <!-- Subtle Car Watermark -->
+    <svg class="car-watermark" viewBox="0 0 200 100" fill="currentColor">
+        <path d="M25,65 L45,35 L125,35 L155,60 L185,65 L185,80 L165,80 A15,15 0 0,1 135,80 L65,80 A15,15 0 0,1 35,80 L15,80 L15,65 Z"/>
+    </svg>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-14 left-1/2 -translate-x-1/2 z-[100] hidden items-center gap-2.5 bg-white text-slate-900 px-4 py-3 rounded-2xl shadow-2xl border border-slate-200 min-w-[250px] max-w-[92vw] transition-all duration-300">
+        <span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shrink-0">✓</span>
+        <span id="toast-msg" class="text-xs font-bold leading-snug">Action saved!</span>
+    </div>
+
+    <!-- Floating Scroll-to-Top Button -->
+    <button id="btn-scroll-top" onclick="scrollToTop()" class="fixed bottom-20 right-4 z-40 hidden items-center gap-1 bg-sky-500 hover:bg-sky-400 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-2xl shadow-lg shadow-sky-500/30 active:scale-95 transition-all">
+        <span>↑</span> <span>Top</span>
+    </button>
+
+    <!-- Top Sticky App Header -->
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-[#0b1120]/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/80 px-3.5 py-2.5">
+        <div class="max-w-md mx-auto flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <button id="header-back-btn" onclick="goBackTab()" class="hidden px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700 text-xs font-extrabold text-sky-400 active:scale-95">
+                    ← Back
+                </button>
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/25 text-white shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9"/>
+                        <circle cx="12" cy="12" r="2.5"/>
+                        <path d="M12 5v4.5M6.5 15.5l4-2.2M17.5 15.5l-4-2.2"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-extrabold text-sm sm:text-base tracking-tight">AutoHub</span>
+                        <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-400 border border-sky-400/30">PRO</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 font-medium leading-none">Smart Garage Suite</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+                <select id="car-select" onchange="switchCar(this.value)" class="bg-slate-100 dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700/80 text-xs font-bold rounded-xl px-2 py-2 outline-none max-w-[135px] truncate">
+                </select>
+                <button onclick="openAddCarModal()" title="Add Vehicle" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700/80 flex items-center justify-center text-sky-400 font-bold text-base active:scale-95">
+                    +
+                </button>
+                <button onclick="toggleTheme()" title="Toggle Theme" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700/80 flex items-center justify-center text-amber-400 active:scale-95">
+                    <span id="theme-icon">☀️</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto px-3.5 pt-3 relative z-10 space-y-4">
+
+        <!-- HERO VEHICLE CARD -->
+        <section id="hero-banner" class="hero-card rounded-3xl p-4 shadow-xl relative overflow-hidden bg-cover bg-center">
+            <div id="hero-overlay" class="absolute inset-0 bg-gradient-to-r from-[#0b1426]/92 via-[#0b1426]/82 to-[#0b1426]/70 pointer-events-none hidden"></div>
+
+            <div class="relative z-10 flex items-start justify-between gap-2 mb-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <img id="hero-car-thumb" src="" alt="Car" onclick="previewFullImage(this.src, getActiveCar().name)" class="hidden w-12 h-12 rounded-2xl object-cover border-2 border-sky-400/60 shadow-md shrink-0 cursor-pointer">
+                    <div onclick="openEditCarModal()" class="cursor-pointer group min-w-0">
+                        <div class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                            <span id="hero-engine" class="truncate">2026 MODEL • 1.3L CVT AUTOMATIC</span>
+                            <span class="text-slate-400 text-[10px]">✎</span>
+                        </div>
+                        <h2 id="hero-name" class="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white truncate">Toyota Yaris Limited Edition</h2>
+                    </div>
+                </div>
+
+                <!-- Dual Camera & Gallery Buttons for Hero Car Photo -->
+                <div class="flex flex-col items-end gap-1 shrink-0">
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="triggerFileInput('input-car-cam')" class="bg-slate-900/80 hover:bg-slate-900 text-sky-400 border border-slate-700 px-2 py-1.5 rounded-xl text-[10px] font-extrabold flex items-center gap-1 active:scale-95">
+                            <span>📷</span><span>Cam</span>
+                        </button>
+                        <button type="button" onclick="triggerFileInput('input-car-gal')" class="bg-slate-900/80 hover:bg-slate-900 text-emerald-400 border border-slate-700 px-2 py-1.5 rounded-xl text-[10px] font-extrabold flex items-center gap-1 active:scale-95">
+                            <span>🖼️</span><span>Photo</span>
+                        </button>
+                    </div>
+                    <span id="car-photo-status" class="text-[9px] font-bold text-emerald-400 hidden">✓ Saved</span>
+                </div>
+            </div>
+
+            <!-- 3 Interactive Stat Cards -->
+            <div class="relative z-10 grid grid-cols-3 gap-2">
+                <div onclick="openOdometerModal()" class="bg-white/80 dark:bg-[#09101f]/85 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-2.5 cursor-pointer active:scale-95 transition-all hover:border-sky-500/50">
+                    <div class="flex items-center justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        <span>ODOMETER</span>
+                        <span class="text-sky-400">✎</span>
+                    </div>
+                    <div id="stat-odo" class="text-xs sm:text-sm font-extrabold text-sky-500 dark:text-sky-400 truncate">10,534 km</div>
+                </div>
+
+                <div onclick="openExpenseModal()" class="bg-white/80 dark:bg-[#09101f]/85 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-2.5 cursor-pointer active:scale-95 transition-all hover:border-sky-500/50">
+                    <div class="flex items-center justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        <span>TOTAL SPENT</span>
+                        <span class="text-amber-400">📊</span>
+                    </div>
+                    <div id="stat-spent" class="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">Rs 17,451</div>
+                </div>
+
+                <div onclick="jumpToLatestHistory()" class="bg-white/80 dark:bg-[#09101f]/85 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-2.5 cursor-pointer active:scale-95 transition-all hover:border-sky-500/50">
+                    <div class="flex items-center justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        <span>LAST CHECK</span>
+                        <span class="text-emerald-400">🕒</span>
+                    </div>
+                    <div id="stat-last" class="text-xs sm:text-sm font-extrabold text-emerald-500 dark:text-emerald-400 truncate">17 Nov</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 1: LOG MAINTENANCE ==================== -->
+        <section id="tab-log" class="tab-panel space-y-4">
+
+            <!-- Routine Health & Quick Check-in Strip -->
+            <div class="glass-card rounded-3xl p-3.5 shadow-xl space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs">🔔</span>
+                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-300">Routine Health & Quick Check-in</span>
+                    </div>
+                    <span id="routine-overall-badge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">All Monitored ✓</span>
+                </div>
+
+                <!-- Horizontal Scrollable Health Chips (Clickable for Past History) -->
+                <div id="routine-chips-box" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                </div>
+
+                <!-- 1-Tap Quick Routine Action Bar -->
+                <div class="flex items-center gap-2 pt-0.5">
+                    <select id="quick-routine-select" class="flex-1 bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-xl px-2.5 py-2 text-xs font-bold outline-none">
+                        <option value="Tyre Pressure Checked (32 PSI)|mechanical">🛞 Tyre Pressure Checked (32 PSI)</option>
+                        <option value="Battery Water Checked / Top-up|fluids">🔋 Battery Water Checked / Top-up</option>
+                        <option value="Radiator Water / Coolant Top-up|water_wash">🌡️ Radiator Water / Coolant Checked</option>
+                        <option value="Wiper Glass Cleaner Water Top-up|water_wash">💧 Wiper Washer Water Refilled</option>
+                        <option value="Engine Oil Dipstick Level Checked|fluids">🛢️ Engine Oil Dipstick Level Checked</option>
+                        <option value="Tyre Puncture Repaired|mechanical">🔧 Tyre Puncture Repaired</option>
+                        <option value="Wet Cloth Wipe - Exterior Body|water_wash">🧽 Wet Microfiber Wipe (Exterior/Interior)</option>
+                    </select>
+                    <button type="button" onclick="quickLogRoutineCheck()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl shrink-0 active:scale-95 shadow-md shadow-emerald-500/20">
+                        ✓ Log Check
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Maintenance Log Form Card -->
+            <div class="glass-card rounded-3xl p-4 shadow-xl space-y-3.5">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">SELECT MAINTENANCE AREA</span>
+                        <button onclick="openAddItemModal()" class="text-[11px] font-bold text-sky-400 flex items-center gap-1 active:scale-95">
+                            <span>⊕</span> Add Custom Item
+                        </button>
+                    </div>
+                    <div id="category-pills" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">SPECIFIC TASK / CHECKUP ITEM</label>
+                    <select id="log-task" onchange="onTaskChange()" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm font-bold outline-none focus:border-sky-500">
+                    </select>
+                </div>
+
+                <!-- Previous Note Auto-Memory Banner -->
+                <div id="prev-note-banner" class="hidden bg-sky-500/10 border border-sky-500/30 rounded-2xl p-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <span id="prev-note-title" class="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">LAST DONE</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="openTaskDrilldown(document.getElementById('log-task').value)" class="text-[10px] font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700">History</button>
+                            <button type="button" onclick="applyPrevNote()" class="text-[10px] font-bold bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-lg border border-sky-400/30 active:scale-95">Reuse Note</button>
+                        </div>
+                    </div>
+                    <p id="prev-note-text" class="text-xs text-slate-300 italic"></p>
+                </div>
+
+                <!-- Date & Odometer Row -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">DATE</label>
+                        <input type="date" id="log-date" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">ODOMETER (KM)</label>
+                        <input type="number" id="log-odo" placeholder="e.g. 10534" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                </div>
+
+                <!-- Brand / Product & Cost Row -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">BRAND / PRODUCT</label>
+                            <button type="button" onclick="openAddBrandModal()" class="text-[10px] font-bold text-sky-400">+ Brand</button>
+                        </div>
+                        <input type="text" id="log-brand" placeholder="Toyota, Flamingo..." class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">COST (RS)</label>
+                        <input type="number" id="log-cost" placeholder="0 for home DIY" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                </div>
+
+                <!-- Quick Brand Chips -->
+                <div id="brand-chips" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                </div>
+
+                <!-- Saved Notes Dropdown + Chips + Textarea -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">NOTES (SELECT SAVED DROPDOWN OR WRITE NEW)</label>
+                        <button type="button" onclick="pinCurrentNote()" class="text-[10px] font-bold text-emerald-400">+ Pin Note</button>
+                    </div>
+
+                    <select id="saved-notes-dropdown" onchange="onSelectSavedNoteDropdown(this)" class="w-full bg-slate-100 dark:bg-[#09101f] border border-sky-500/40 rounded-2xl px-3 py-2.5 text-xs font-bold text-sky-300 outline-none">
+                        <option value="">📋 Select a Previously Saved Note...</option>
+                    </select>
+
+                    <div id="note-chips" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                    </div>
+
+                    <textarea id="log-notes" rows="2" placeholder="Details: e.g. Top-up radiator water, wiped dashboard with damp microfiber..." class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl p-3 text-xs font-medium outline-none"></textarea>
+                </div>
+
+                <!-- Receipt / Invoice Photo + AI Scanner + Next Due KM -->
+                <div class="bg-slate-100/70 dark:bg-[#09101f]/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">📎 RECEIPT / PART PHOTO & AI SCAN</span>
+                        <span id="log-photo-status" class="text-[10px] font-bold text-emerald-400 hidden">✓ Ready</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" onclick="triggerFileInput('input-log-cam')" class="py-2.5 px-2 rounded-xl bg-slate-200 dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700 text-xs font-extrabold text-sky-400 flex items-center justify-center gap-1 active:scale-95">
+                            <span>📷</span> <span>Camera</span>
+                        </button>
+                        <button type="button" onclick="triggerFileInput('input-log-gal')" class="py-2.5 px-2 rounded-xl bg-slate-200 dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700 text-xs font-extrabold text-emerald-400 flex items-center justify-center gap-1 active:scale-95">
+                            <span>🖼️</span> <span>Gallery</span>
+                        </button>
+                        <button type="button" onclick="scanReceiptWithGemini('log')" id="btn-ai-scan-log" class="py-2.5 px-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-xs font-extrabold text-purple-300 flex items-center justify-center gap-1 active:scale-95">
+                            <span>🤖</span> <span>AI Scan</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Thumbnail Preview for Maintenance Photo -->
+                    <div id="log-photo-preview-box" class="hidden flex items-center justify-between bg-slate-900/90 p-2 rounded-xl border border-emerald-500/40">
+                        <div class="flex items-center gap-2.5">
+                            <img id="log-photo-thumb" src="" onclick="previewFullImage(this.src, 'Attached Receipt / Maintenance Photo')" class="w-12 h-12 rounded-lg object-cover border border-slate-600 cursor-pointer">
+                            <div>
+                                <div class="text-xs font-extrabold text-emerald-400">Photo Attached ✓</div>
+                                <div id="log-photo-kb" class="text-[10px] text-slate-400">Tap thumbnail to enlarge</div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearAttachedPhoto('log')" class="text-xs text-rose-400 font-bold px-2 py-1">Remove</button>
+                    </div>
+
+                    <div class="pt-1">
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">NEXT FOLLOW-UP ODOMETER (KM) - OPTIONAL</label>
+                        <input type="number" id="log-next-km" placeholder="e.g. 15534" class="w-full bg-white dark:bg-[#0b1120] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="button" onclick="saveMaintenanceLog()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-extrabold text-sm shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all">
+                    <span>✓</span> Save Record to Garage
+                </button>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: VISUAL BODY DENTS MAPPER ==================== -->
+        <section id="tab-dents" class="tab-panel hidden space-y-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBackTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">TAP ANY DENT CARD FOR FULL DETAILS</span>
+            </div>
+
+            <div class="glass-card rounded-3xl p-4 shadow-xl space-y-3.5">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-extrabold flex items-center gap-1.5">
+                            <span class="text-rose-500">🚗</span> Visual Body Zone & Dent Mapper
+                        </h3>
+                        <p class="text-[11px] text-slate-400">Select car body part, take camera/gallery photo & track repair</p>
+                    </div>
+                    <span id="selected-zone-badge" class="text-[10px] font-extrabold px-2.5 py-1 rounded-xl bg-orange-500/15 text-orange-400 border border-orange-500/30 shrink-0">Front Bumper</span>
+                </div>
+
+                <!-- 3x4 Visual Car Body Grid -->
+                <div class="bg-slate-100 dark:bg-[#09101f] border border-slate-200 dark:border-slate-800 rounded-2xl p-3">
+                    <div class="text-center text-[9px] font-extrabold uppercase tracking-widest text-slate-400 mb-2">▲ FRONT OF VEHICLE ▲</div>
+                    <div id="body-zone-grid" class="grid grid-cols-3 gap-2">
+                    </div>
+                </div>
+
+                <!-- Saved Dent Notes Quick Dropdown -->
+                <select id="dent-saved-notes" onchange="if(this.value){document.getElementById('dent-note').value=this.value; this.value='';}" class="w-full bg-slate-100 dark:bg-[#09101f] border border-orange-500/30 rounded-2xl px-3 py-2.5 text-xs font-bold text-orange-300 outline-none">
+                    <option value="">📋 Select a Saved Note for Dent / Scratch...</option>
+                    <option value="Clear coat scratch (fingernail does not catch)">Clear coat scratch (fingernail does not catch)</option>
+                    <option value="Light surface scratch found during car wash">Light surface scratch found during car wash</option>
+                    <option value="Minor parking mark / slight dent">Minor parking mark / slight dent</option>
+                    <option value="Buffed with Flamingo Coating & Formula 1 Wax">Buffed with Flamingo Coating & Formula 1 Wax</option>
+                </select>
+
+                <!-- Note & Severity Row -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="col-span-2">
+                        <input type="text" id="dent-note" placeholder="Note (e.g. Clear coat scratch)" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <select id="dent-severity" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-2.5 py-2.5 text-xs font-bold outline-none">
+                            <option value="Scratch">Scratch</option>
+                            <option value="Minor Dent">Minor Dent</option>
+                            <option value="Dent">Dent</option>
+                            <option value="Paint Touchup">Touchup</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Est Cost + Camera & Gallery Buttons -->
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" id="dent-cost" placeholder="Est. Rs" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    <button type="button" onclick="triggerFileInput('input-dent-cam')" class="bg-slate-100 dark:bg-[#09101f] border border-rose-500/40 rounded-2xl px-2 py-2.5 text-xs font-extrabold text-rose-400 flex items-center justify-center gap-1 active:scale-95">
+                        <span>📷</span> <span>Camera</span>
+                    </button>
+                    <button type="button" onclick="triggerFileInput('input-dent-gal')" class="bg-slate-100 dark:bg-[#09101f] border border-amber-500/40 rounded-2xl px-2 py-2.5 text-xs font-extrabold text-amber-400 flex items-center justify-center gap-1 active:scale-95">
+                        <span>🖼️</span> <span>Gallery</span>
+                    </button>
+                </div>
+
+                <!-- Live Thumbnail Preview for Dent Photo -->
+                <div id="dent-photo-preview-box" class="hidden flex items-center justify-between bg-slate-900/90 p-2 rounded-xl border border-rose-500/40">
+                    <div class="flex items-center gap-2.5">
+                        <img id="dent-photo-thumb" src="" onclick="previewFullImage(this.src, 'Dent / Scratch Photo')" class="w-12 h-12 rounded-lg object-cover border border-slate-600 cursor-pointer">
+                        <div>
+                            <div class="text-xs font-extrabold text-rose-400">Dent Photo Ready ✓</div>
+                            <div id="dent-photo-kb" class="text-[10px] text-slate-400">Tap image to inspect</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearAttachedPhoto('dent')" class="text-xs text-rose-400 font-bold px-2 py-1">Remove</button>
+                </div>
+
+                <button type="button" onclick="saveDentLog()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 text-white font-extrabold text-sm shadow-lg shadow-rose-500/25 flex items-center justify-center gap-2 active:scale-95">
+                    <span>⊕</span> Save Marked Dent / Work
+                </button>
+            </div>
+
+            <!-- Dent Filter Pills -->
+            <div class="flex gap-2">
+                <button onclick="setDentFilter('all')" id="df-all" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500 text-white">All</button>
+                <button onclick="setDentFilter('pending')" id="df-pending" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-[#111a2e] text-slate-400">Pending</button>
+                <button onclick="setDentFilter('fixed')" id="df-fixed" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-[#111a2e] text-slate-400">Fixed</button>
+            </div>
+
+            <div id="dent-list" class="space-y-2.5"></div>
+        </section>
+
+        <!-- ==================== TAB 3: SMART ODOMETER FUEL TRACKER ==================== -->
+        <section id="tab-fuel" class="tab-panel hidden space-y-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBackTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">FUEL & MILEAGE LOG</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2.5">
+                <div class="glass-card rounded-2xl p-3 text-center">
+                    <div class="text-[10px] font-bold text-slate-400 mb-0.5">Latest Avg</div>
+                    <div id="fuel-latest-avg" class="text-sm font-extrabold text-emerald-400">-- km/L</div>
+                </div>
+                <div class="glass-card rounded-2xl p-3 text-center">
+                    <div class="text-[10px] font-bold text-slate-400 mb-0.5">Best Avg</div>
+                    <div id="fuel-best-avg" class="text-sm font-extrabold text-sky-400">-- km/L</div>
+                </div>
+                <div class="glass-card rounded-2xl p-3 text-center">
+                    <div class="text-[10px] font-bold text-slate-400 mb-0.5">Cost / km</div>
+                    <div id="fuel-cost-km" class="text-sm font-extrabold text-amber-400">Rs --</div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-4 shadow-xl space-y-3.5">
+                <div class="flex items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-extrabold flex items-center gap-1.5">
+                            <span>⛽</span> Smart Odometer Fuel Log
+                        </h3>
+                        <p class="text-[10px] text-slate-400">Auto-calculates distance from previous meter reading</p>
+                    </div>
+                    <button type="button" onclick="toggleFuelMode()" id="fuel-mode-btn" class="text-[10px] font-bold px-2.5 py-1.5 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30 shrink-0">
+                        Switch to Trip Mode
+                    </button>
+                </div>
+
+                <div id="fuel-odo-inputs" class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">Previous Odometer (km)</label>
+                        <input type="number" id="fuel-prev-odo" oninput="previewFuelCalc()" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-sky-400 mb-1">Current Odometer (km)</label>
+                        <input type="number" id="fuel-curr-odo" oninput="previewFuelCalc()" placeholder="e.g. 10850" class="w-full bg-slate-100 dark:bg-[#09101f] border border-sky-500/60 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                </div>
+
+                <div id="fuel-trip-inputs" class="hidden">
+                    <label class="block text-[10px] font-bold text-sky-400 mb-1">Trip Distance Driven (km)</label>
+                    <input type="number" id="fuel-trip-dist" oninput="previewFuelCalc()" placeholder="e.g. 320" class="w-full bg-slate-100 dark:bg-[#09101f] border border-sky-500/60 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                </div>
+
+                <div id="fuel-live-preview" class="hidden bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-extrabold text-emerald-400">
+                    <span id="fuel-live-dist">Driven: 0 km</span>
+                    <span id="fuel-live-avg">-- km/L</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">Litres Filled</label>
+                        <input type="number" step="0.01" id="fuel-litres" oninput="previewFuelCalc()" placeholder="e.g. 23.5" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">Total Bill (Rs)</label>
+                        <input type="number" id="fuel-bill" oninput="previewFuelCalc()" placeholder="e.g. 6200" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                    </div>
+                </div>
+
+                <!-- Camera, Gallery & AI Scan for Fuel Meter/Receipt -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" onclick="triggerFileInput('input-fuel-cam')" class="py-2.5 px-2 rounded-xl bg-slate-100 dark:bg-[#09101f] border border-amber-500/40 text-xs font-extrabold text-amber-400 flex items-center justify-center gap-1 active:scale-95">
+                        <span>📷</span> <span>Camera</span>
+                    </button>
+                    <button type="button" onclick="triggerFileInput('input-fuel-gal')" class="py-2.5 px-2 rounded-xl bg-slate-100 dark:bg-[#09101f] border border-emerald-500/40 text-xs font-extrabold text-emerald-400 flex items-center justify-center gap-1 active:scale-95">
+                        <span>🖼️</span> <span>Gallery</span>
+                    </button>
+                    <button type="button" onclick="scanReceiptWithGemini('fuel')" id="btn-ai-scan-fuel" class="py-2.5 px-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-xs font-extrabold text-purple-300 flex items-center justify-center gap-1 active:scale-95">
+                        <span>🤖</span> <span>AI Scan</span>
+                    </button>
+                </div>
+
+                <div id="fuel-photo-preview-box" class="hidden flex items-center justify-between bg-slate-900/90 p-2 rounded-xl border border-amber-500/40">
+                    <div class="flex items-center gap-2.5">
+                        <img id="fuel-photo-thumb" src="" onclick="previewFullImage(this.src, 'Fuel Meter / Receipt Photo')" class="w-12 h-12 rounded-lg object-cover border border-slate-600 cursor-pointer">
+                        <div>
+                            <div class="text-xs font-extrabold text-amber-400">Meter/Receipt Ready ✓</div>
+                            <div id="fuel-photo-kb" class="text-[10px] text-slate-400">Tap to view full photo</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearAttachedPhoto('fuel')" class="text-xs text-rose-400 font-bold px-2 py-1">Remove</button>
+                </div>
+
+                <button type="button" onclick="saveFuelLog()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/20 active:scale-95">
+                    Calculate & Save Fuel Entry
+                </button>
+            </div>
+
+            <div id="fuel-history-list" class="space-y-2.5"></div>
+        </section>
+
+        <!-- ==================== TAB 4: HISTORY TIMELINE ==================== -->
+        <section id="tab-history" class="tab-panel hidden space-y-3">
+            <div class="flex items-center justify-between">
+                <button onclick="goBackTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <span id="hist-count-badge" class="text-[10px] font-extrabold px-2.5 py-1 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30">7 Records</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                <div class="col-span-2">
+                    <input type="text" id="hist-search" oninput="renderHistory()" placeholder="🔍 Search Ravi, oil, Flamingo..." class="w-full bg-white dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                </div>
+                <select id="hist-filter" onchange="renderHistory()" class="bg-white dark:bg-[#111a2e] border border-slate-300 dark:border-slate-700/80 rounded-2xl px-2.5 py-2.5 text-xs font-bold outline-none">
+                    <option value="all">All Logs</option>
+                    <option value="water_wash">💧 Water/Wash</option>
+                    <option value="fluids">🛢️ Fluids/Oil</option>
+                    <option value="detailing">✨ Polishing</option>
+                    <option value="mechanical">🔧 Mechanical</option>
+                </select>
+            </div>
+
+            <div id="history-list" class="space-y-2.5"></div>
+        </section>
+
+        <!-- ==================== TAB 5: METER LIGHTS & CARE GUIDES ==================== -->
+        <section id="tab-guides" class="tab-panel hidden space-y-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBackTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">CLUSTER LIGHTS & CARE SOPS</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 bg-slate-200 dark:bg-[#111a2e] p-1 rounded-2xl">
+                <button onclick="switchGuideSubTab('lights')" id="gsub-lights" class="py-2 rounded-xl text-xs font-extrabold pill-active">
+                    🚨 Meter Lights Guide
+                </button>
+                <button onclick="switchGuideSubTab('sops')" id="gsub-sops" class="py-2 rounded-xl text-xs font-extrabold text-slate-400">
+                    ✨ Care & Wash SOPs
+                </button>
+            </div>
+
+            <div id="guide-lights-panel" class="space-y-3">
+                <div id="yaris-cluster-box" class="glass-card rounded-3xl p-4 shadow-xl space-y-3.5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">TOYOTA YARIS GLI 1.3 EXCLUSIVE</span>
+                            <h3 class="text-sm font-extrabold">Instrument Cluster Warning Lights</h3>
+                            <p class="text-[11px] text-slate-400">Tap any indicator below to inspect full guidance</p>
+                        </div>
+                    </div>
+                    <div id="cluster-lights-grid" class="grid grid-cols-3 gap-2.5"></div>
+                    <div id="cluster-light-detail" class="bg-slate-100 dark:bg-[#09101f] border border-sky-500/40 rounded-2xl p-3.5 space-y-1.5"></div>
+                </div>
+
+                <div id="cultus-cluster-box" class="hidden glass-card rounded-3xl p-4 shadow-xl space-y-2">
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">SUZUKI CULTUS 2004 MANUAL CLUSTER</span>
+                    <h3 class="text-sm font-extrabold">Analog Needle Meter & Basic Indicators</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Your 2004 Suzuki Cultus uses a direct analog temperature gauge needle alongside basic Oil Pressure (Red Can), Battery Charge, and Handbrake indicators. Always monitor the C-to-H temperature needle during city traffic and inspect radiator water manually before long drives.
+                    </p>
+                </div>
+            </div>
+
+            <div id="guide-sops-panel" class="hidden space-y-3">
+                <div class="glass-card rounded-2xl p-4 space-y-1.5">
+                    <h4 class="text-xs font-extrabold text-sky-400 uppercase tracking-wider">✨ 1. Double-Layer Coating & Formula 1 Carnauba Wax SOP</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">1) Wash thoroughly with Flamingo Car Shampoo (Two-Bucket Method, Top-to-Bottom). 2) Spray Flamingo Nano Crystal Coating (F112) on cool body & buff with clean microfiber. 3) Allow 24-hour curing gap. 4) Wipe surface dust & apply Formula 1 Carnauba Wax for deep gloss protection.</p>
+                </div>
+                <div class="glass-card rounded-2xl p-4 space-y-1.5">
+                    <h4 class="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">🪟 2. DIY Glass Cleaner & Bug Splatter Rule</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">Mix 2 to 3 drops of dishwash in 1 Litre clean water. Always spray onto the microfiber cloth (never directly on painted edges) so your wax coat remains intact. Soften bug splatters with shampoo foam instead of scraping with fingernails.</p>
+                </div>
+                <div class="glass-card rounded-2xl p-4 space-y-1.5">
+                    <h4 class="text-xs font-extrabold text-amber-400 uppercase tracking-wider">🔋 3. Battery Water, Radiator & 15-Day Checkups</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">Inspect battery distilled water level, radiator coolant reservoir, and tyre air pressure (32 PSI) every 15 days. After applying Flamingo Tire Foam, wipe excess foam with a damp cloth for a natural black finish.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 6: BACKUP, AI KEY & CLOUD SYNC ==================== -->
+        <section id="tab-backup" class="tab-panel hidden space-y-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBackTab()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">MASTER DB & CLOUD SYNC</span>
+            </div>
+
+            <!-- Single Master File & Cloud Backup Card -->
+            <div class="glass-card rounded-3xl p-4 shadow-xl space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold shrink-0">💾</div>
+                    <div>
+                        <h3 class="text-sm font-extrabold">Single Master Database & Cloud Sync</h3>
+                        <p class="text-[11px] text-slate-400">All changes auto-save inside IndexedDB (`AutoHubPro_MasterDB`). Use Overwrite Mode to update a single `AutoHub_Master_DB.json` file without duplicates.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" onclick="overwriteSingleMasterFile()" class="py-3 px-2 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-extrabold text-xs shadow-lg shadow-sky-500/20">
+                        🔄 Update Single Master File
+                    </button>
+                    <button type="button" onclick="triggerFileInput('input-restore-json')" class="py-3 px-2 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20">
+                        ⬆ Restore Backup (.JSON)
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button type="button" onclick="shareDatabaseToCloud()" class="py-2.5 px-2 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-extrabold text-xs">
+                        📤 Share to Drive / Gmail
+                    </button>
+                    <button type="button" onclick="emailDatabaseSummary()" class="py-2.5 px-2 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-extrabold text-xs">
+                        ✉️ Email Backup to Self
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Receipt Scanner API Key & Silent Background Notifications -->
+            <div class="glass-card rounded-3xl p-4 shadow-xl space-y-3">
+                <h3 class="text-sm font-extrabold flex items-center gap-1.5">
+                    <span>🤖</span> Gemini AI Key & Silent Background Alerts
+                </h3>
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">GOOGLE GEMINI API KEY (FOR RECEIPT & METER OCR)</label>
+                    <div class="flex gap-2">
+                        <input type="password" id="settings-gemini-key" placeholder="Paste AIzaSy... key here" class="flex-1 bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                        <button type="button" onclick="saveAppSettings()" class="bg-sky-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl">Save</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">YOUR GMAIL ADDRESS (FOR 1-TAP EMAIL BACKUP)</label>
+                    <input type="email" id="settings-backup-email" placeholder="yourname@gmail.com" onchange="saveAppSettings()" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none">
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                    <div>
+                        <div class="text-xs font-extrabold">🔔 Silent Routine Health Alerts</div>
+                        <div class="text-[10px] text-slate-400">Notify when Tyre, Battery or Radiator check is due</div>
+                    </div>
+                    <button type="button" onclick="enableSilentNotifications()" id="btn-notif-perm" class="px-3 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold">
+                        Enable Alerts
+                    </button>
+                </div>
+            </div>
+
+            <!-- Garage Profiles Manager -->
+            <div class="glass-card rounded-3xl p-4 shadow-xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">YOUR GARAGE PROFILES</span>
+                    <button onclick="openAddCarModal()" class="text-xs font-extrabold text-sky-400">+ Add Car</button>
+                </div>
+                <div id="garage-profiles-list" class="space-y-2.5"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- 1. Set / Reset Odometer Modal -->
+    <div id="modal-odo" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card w-full max-w-sm rounded-3xl p-5 space-y-4 border border-sky-500/40">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-extrabold text-sky-400">⏲ Set / Reset Odometer</h3>
+                <button onclick="closeModal('modal-odo')" class="text-slate-400 text-lg font-bold">✕</button>
+            </div>
+            <p id="modal-odo-sub" class="text-xs text-slate-400">Enter present meter reading:</p>
+            <input type="number" id="modal-odo-input" class="w-full bg-slate-100 dark:bg-[#09101f] border border-sky-500 rounded-2xl px-3.5 py-3 text-base font-extrabold outline-none">
+            <div class="grid grid-cols-2 gap-2.5">
+                <button onclick="closeModal('modal-odo')" class="py-2.5 rounded-2xl bg-slate-800 text-slate-300 text-xs font-bold">Cancel</button>
+                <button onclick="confirmOdometerSave()" class="py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-extrabold">Save Odometer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Drill-down Detail & Item History Modal -->
+    <div id="modal-drilldown" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card w-full max-w-md max-h-[85vh] flex flex-col rounded-3xl p-4 border border-sky-500/40">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <button onclick="closeModal('modal-drilldown')" class="px-3 py-1 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <h3 id="drilldown-title" class="text-xs font-extrabold uppercase tracking-wider text-slate-300 truncate max-w-[200px]">Record Details</h3>
+                <button onclick="closeModal('modal-drilldown')" class="text-slate-400 text-base font-bold">✕</button>
+            </div>
+            <div id="drilldown-body" class="overflow-y-auto space-y-3 py-3 pr-1"></div>
+        </div>
+    </div>
+
+    <!-- 3. Full Image Lightbox Modal -->
+    <div id="modal-image" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/90 p-4">
+        <div class="w-full max-w-md space-y-3">
+            <div class="flex items-center justify-between">
+                <button onclick="closeModal('modal-image')" class="px-3.5 py-1.5 rounded-xl bg-slate-800 text-sky-400 text-xs font-extrabold">← Back</button>
+                <span id="modal-image-title" class="text-xs font-bold text-slate-300 truncate">Photo Preview</span>
+                <button onclick="closeModal('modal-image')" class="text-white text-lg font-bold">✕</button>
+            </div>
+            <img id="modal-image-src" src="" class="w-full max-h-[75vh] object-contain rounded-2xl border border-slate-700">
+        </div>
+    </div>
+
+    <!-- 4. Add Custom Item Modal -->
+    <div id="modal-add-item" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card w-full max-w-sm rounded-3xl p-5 space-y-4 border border-sky-500/40">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-extrabold text-sky-400">⊕ Add Custom Maintenance Item</h3>
+                <button onclick="closeModal('modal-add-item')" class="text-slate-400 text-lg font-bold">✕</button>
+            </div>
+            <select id="new-item-cat" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-700 rounded-2xl px-3 py-2.5 text-xs font-bold outline-none">
+                <option value="water_wash">💧 Water & Daily Wash</option>
+                <option value="fluids">🛢️ Fluids & Filters</option>
+                <option value="detailing">✨ Polishing & Detailing</option>
+                <option value="mechanical">🔧 Mechanical & Tuning</option>
+            </select>
+            <input type="text" id="new-item-name" placeholder="Item Name (e.g. Front Tweeters Install)" class="w-full bg-slate-100 dark:bg-[#09101f] border border-sky-500 rounded-2xl px-3.5 py-3 text-xs font-bold outline-none">
+            <div class="grid grid-cols-2 gap-2.5">
+                <button onclick="closeModal('modal-add-item')" class="py-2.5 rounded-2xl bg-slate-800 text-slate-300 text-xs font-bold">Cancel</button>
+                <button onclick="confirmAddCustomItem()" class="py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-extrabold">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Add Brand Modal -->
+    <div id="modal-add-brand" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card w-full max-w-sm rounded-3xl p-5 space-y-4 border border-sky-500/40">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-extrabold text-sky-400">🏷 Add Brand Chip</h3>
+                <button onclick="closeModal('modal-add-brand')" class="text-slate-400 text-lg font-bold">✕</button>
+            </div>
+            <input type="text" id="new-brand-name" placeholder="Brand Name (e.g. Formula 1, Denso)" class="w-full bg-slate-100 dark:bg-[#09101f] border border-sky-500 rounded-2xl px-3.5 py-3 text-xs font-bold outline-none">
+            <div class="grid grid-cols-2 gap-2.5">
+                <button onclick="closeModal('modal-add-brand')" class="py-2.5 rounded-2xl bg-slate-800 text-slate-300 text-xs font-bold">Cancel</button>
+                <button onclick="confirmAddBrand()" class="py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-extrabold">Save Brand</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Add / Edit Vehicle Modal -->
+    <div id="modal-car" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card w-full max-w-sm rounded-3xl p-5 space-y-4 border border-sky-500/40">
+            <div class="flex items-center justify-between">
+                <h3 id="modal-car-title" class="text-sm font-extrabold text-sky-400">🚘 Vehicle Profile</h3>
+                <button onclick="closeModal('modal-car')" class="text-slate-400 text-lg font-bold">✕</button>
+            </div>
+            <input type="text" id="car-form-name" placeholder="Vehicle Name" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-700 rounded-2xl px-3.5 py-2.5 text-xs font-bold outline-none">
+            <input type="text" id="car-form-specs" placeholder="Specs (e.g. 2026 Model • 1.3L CVT)" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-700 rounded-2xl px-3.5 py-2.5 text-xs font-bold outline-none">
+            <input type="number" id="car-form-odo" placeholder="Current Odometer (km)" class="w-full bg-slate-100 dark:bg-[#09101f] border border-slate-700 rounded-2xl px-3.5 py-2.5 text-xs font-bold outline-none">
+            <div class="grid grid-cols-2 gap-2.5">
+                <button onclick="closeModal('modal-car')" class="py-2.5 rounded-2xl bg-slate-800 text-slate-300 text-xs font-bold">Cancel</button>
+                <button onclick="confirmSaveCar()" class="py-2.5 rounded-2xl bg-sky-500 text-white text-xs font-extrabold">Save Vehicle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800/80 px-2 py-2">
+        <div class="max-w-md mx-auto grid grid-cols-6 gap-1">
+            <button onclick="switchTab('log')" id="nav-log" class="flex flex-col items-center justify-center py-1 rounded-xl text-sky-400 font-extrabold">
+                <span class="text-base leading-none mb-1">⊕</span>
+                <span class="text-[10px]">Log</span>
+            </button>
+            <button onclick="switchTab('dents')" id="nav-dents" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 font-semibold">
+                <span class="text-base leading-none mb-1">🚗</span>
+                <span class="text-[10px]">Dents</span>
+            </button>
+            <button onclick="switchTab('fuel')" id="nav-fuel" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 font-semibold">
+                <span class="text-base leading-none mb-1">⛽</span>
+                <span class="text-[10px]">Fuel</span>
+            </button>
+            <button onclick="switchTab('history')" id="nav-history" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 font-semibold">
+                <span class="text-base leading-none mb-1">🕒</span>
+                <span class="text-[10px]">History</span>
+            </button>
+            <button onclick="switchTab('guides')" id="nav-guides" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 font-semibold">
+                <span class="text-base leading-none mb-1">⏲</span>
+                <span class="text-[10px]">Guides</span>
+            </button>
+            <button onclick="switchTab('backup')" id="nav-backup" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 font-semibold">
+                <span class="text-base leading-none mb-1">☁️</span>
+                <span class="text-[10px]">Backup</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        const STORAGE_KEY = 'autohub_pro_v8_master_db';
+        const IDB_NAME = 'AutoHubPro_MasterDB';
+        const IDB_STORE = 'garage_state';
+
+        const DEFAULT_CATEGORIES = [
+            { id: 'water_wash', label: '💧 Water & Daily Wash' },
+            { id: 'fluids', label: '🛢️ Fluids & Filters' },
+            { id: 'detailing', label: '✨ Polishing & Detailing' },
+            { id: 'mechanical', label: '🔧 Mechanical & Tuning' }
+        ];
+
+        const DEFAULT_TASKS = {
+            water_wash: [
+                'Radiator Water / Coolant Top-up',
+                'Wiper Glass Cleaner Water Top-up',
+                'Wet Cloth Wipe - Exterior Body',
+                'Wet Cloth Wipe - Interior Cabin',
+                'Full Pressure Car Wash (Service Station)',
+                'Flamingo Car Wash Shampoo (Home)',
+                'Microfiber Quick Dust Wipe'
+            ],
+            fluids: [
+                'Engine Oil & Oil Filter Change (10,000 km Service)',
+                'Engine Oil Change',
+                'Oil Filter Replacement',
+                'Battery Water Checked / Top-up',
+                'Engine Oil Dipstick Level Checked',
+                'Air Filter Clean / Change',
+                'AC Cabin Filter Clean / Change',
+                'CVT / Transmission Fluid Check',
+                'Brake Fluid (DOT-3 / DOT-4) Top-up'
+            ],
+            detailing: [
+                'Double Layer Polishing (Coating + Wax)',
+                'Flamingo Nano Crystal Coating (F112)',
+                'Formula 1 Carnauba Wax Coat',
+                'Dashboard & Trim UV Polish',
+                'Flamingo Tire Foam & Damp Wipe',
+                'Interior Vacuum & Jello Black Ice Freshener'
+            ],
+            mechanical: [
+                'Tyre Pressure Checked (32 PSI)',
+                'Tyre Puncture Repaired',
+                'First Free Inspection',
+                'Speaker Installation',
+                'Wheel Alignment & Alloy Sticker Weights',
+                'Brake Pads & Discs Inspection',
+                'Spark Plugs & Throttle Body Clean',
+                'AC Cooling & Gas Check'
+            ]
+        };
+
+        const ROUTINE_CHECK_ITEMS = [
+            { id: 'tyre', label: 'Tyre Pressure', icon: '🛞', maxDays: 14, matchTasks: ['Tyre Pressure Checked (32 PSI)', 'Wheel Alignment & Alloy Sticker Weights'] },
+            { id: 'battery', label: 'Battery Water', icon: '🔋', maxDays: 15, matchTasks: ['Battery Water Checked / Top-up', 'Engine Oil & Oil Filter Change (10,000 km Service)'] },
+            { id: 'radiator', label: 'Radiator Coolant', icon: '🌡️', maxDays: 15, matchTasks: ['Radiator Water / Coolant Top-up'] },
+            { id: 'wiper', label: 'Wiper Water', icon: '💧', maxDays: 15, matchTasks: ['Wiper Glass Cleaner Water Top-up', 'Radiator Water / Coolant Top-up'] },
+            { id: 'oil_level', label: 'Oil Dipstick', icon: '🛢️', maxDays: 30, matchTasks: ['Engine Oil Dipstick Level Checked', 'Engine Oil & Oil Filter Change (10,000 km Service)', 'Engine Oil Change'] }
+        ];
+
+        const BODY_ZONES = [
+            'Left Fender', 'Front Bumper', 'Right Fender',
+            'Front L-Door', 'Bonnet / Hood', 'Front R-Door',
+            'Rear L-Door', 'Roof / Glass', 'Rear R-Door',
+            'Left Quarter', 'Trunk / Rear', 'Right Quarter'
+        ];
+
+        const YARIS_LIGHTS = [
+            {
+                id: 'coolant_blue', icon: '🌡️', name: 'Blue Temp', sub: 'Cold / Red=Hot', badge: 'Normal on Cold Start', color: 'text-sky-400',
+                title: '🌡️ Blue Coolant Thermometer (Engine Cold)',
+                desc: 'Stays ON blue during morning cold start. Drive gently under 2,000 RPM until it turns off. CRITICAL: If it turns RED, pull over safely and turn off engine immediately to prevent overheating!'
+            },
+            {
+                id: 'check_engine', icon: '⚙️', name: 'Check Engine', sub: 'OBD Sensor', badge: 'Inspect if Steady', color: 'text-amber-400',
+                title: '⚙️ Check Engine Malfunction Indicator',
+                desc: 'Turns on during ignition check and goes off when engine starts. If steady while driving, check fuel cap, oxygen sensor, or scan via OBD-II.'
+            },
+            {
+                id: 'oil_pressure', icon: '🛢️', name: 'Oil Pressure', sub: 'Low Oil Alert', badge: 'Critical Warning', color: 'text-rose-400',
+                title: '🛢️ Low Engine Oil Pressure Warning',
+                desc: 'If this red oil can illuminates while driving, stop immediately, switch off the engine, and inspect oil level on dipstick.'
+            },
+            {
+                id: 'battery_charge', icon: '🔋', name: 'Battery Alert', sub: 'Alternator/Water', badge: 'Check Water & Belt', color: 'text-rose-400',
+                title: '🔋 Battery / Charging System Alert',
+                desc: 'Indicates low battery voltage or alternator issue. Always check battery distilled water levels every 15 days so plates never dry out!'
+            },
+            {
+                id: 'eps_steering', icon: '🛞', name: 'EPS Light', sub: 'Power Steering', badge: 'Electric Steering', color: 'text-amber-400',
+                title: '🛞 Electric Power Steering (EPS) Indicator',
+                desc: 'Lights up at ignition ON and turns off after starting. If it stays on, steering becomes heavy—check battery voltage.'
+            },
+            {
+                id: 'brake_warn', icon: '❗', name: 'Brake (!)', sub: 'Handbrake/Fluid', badge: 'Check Fluid if Down', color: 'text-rose-400',
+                title: '❗ Brake System / Handbrake Indicator',
+                desc: 'Stays on when handbrake is up. If handbrake is fully down and light stays ON, inspect Brake Fluid level immediately.'
+            },
+            {
+                id: 'abs_light', icon: 'Ⓐ', name: 'ABS Light', sub: 'Anti-Lock Brake', badge: 'Wheel Sensor', color: 'text-amber-400',
+                title: 'Ⓐ Anti-Lock Braking System (ABS)',
+                desc: 'Turns on for 3 seconds at startup. If it remains lit, a wheel speed sensor may have dust or mud after washing.'
+            },
+            {
+                id: 'immobilizer', icon: '🔐', name: 'Immobilizer', sub: 'Blinking Red', badge: 'Security Armed', color: 'text-rose-400',
+                title: '🔐 Engine Immobilizer Security Light',
+                desc: 'Blinks red when key is removed—confirming the Yaris anti-theft immobilizer system is armed.'
+            },
+            {
+                id: 'eco_mode', icon: '🌿', name: 'ECO Mode', sub: '1500-2000 RPM', badge: 'Fuel Efficiency', color: 'text-emerald-400',
+                title: '🌿 ECO Driving Indicator (Yaris CVT)',
+                desc: 'Illuminates green during smooth throttle cruising (1,500–2,000 RPM) for best fuel average.'
+            }
+        ];
+
+        const MASTER_YARIS_LOGS = [
+            {
+                id: 'log_ravi_10534',
+                carId: 'yaris_2026',
+                category: 'fluids',
+                task: 'Engine Oil & Oil Filter Change (10,000 km Service)',
+                date: '2026-11-17',
+                odometer: 10534,
+                brand: 'Toyota Genuine (TGMO 5W-30)',
+                cost: 17451,
+                notes: 'Toyota Ravi Motors (Inv #40340, Reg BMU-951). TGMO 5W-30 3.5L (Rs 8,190), Oil Filter 90915-YZZN2 (Rs 2,421), Battery Water x2 (Rs 160 - battery was dry, refilled), Alloy Rim Sticker Weight x3 (Rs 270), Sand Paper (Rs 100), Light Maintenance Labour (Rs 6,960). Total Payable: Rs 17,451.',
+                nextKm: 15534,
+                photo: null
+            },
+            {
+                id: 'log_wipe_10200',
+                carId: 'yaris_2026',
+                category: 'water_wash',
+                task: 'Wet Cloth Wipe - Exterior Body',
+                date: '2026-11-13',
+                odometer: 10200,
+                brand: 'Microfiber Cloth',
+                cost: 0,
+                notes: 'Wipe cloth cleaning. Routine work.',
+                nextKm: null,
+                photo: null
+            },
+            {
+                id: 'log_rad_6000',
+                carId: 'yaris_2026',
+                category: 'water_wash',
+                task: 'Radiator Water / Coolant Top-up',
+                date: '2026-07-21',
+                odometer: 6000,
+                brand: 'Flamingo',
+                cost: 0,
+                notes: 'Main Radiator: 50ml water added. Coolant Reservoir: 250-300ml added. Wiper Fluid Reservoir: 2L water with 3-4 drops Car Wash Shampoo.',
+                nextKm: 10000,
+                photo: null
+            },
+            {
+                id: 'log_spk_5500',
+                carId: 'yaris_2026',
+                category: 'mechanical',
+                task: 'Speaker Installation',
+                date: '2026-06-15',
+                odometer: 5500,
+                brand: 'Custom Upgrade',
+                cost: 0,
+                notes: 'Installed 2 new back door speakers. Front dashboard tweeters planned next.',
+                nextKm: null,
+                photo: null
+            },
+            {
+                id: 'log_oil_5100',
+                carId: 'yaris_2026',
+                category: 'fluids',
+                task: 'Engine Oil Change',
+                date: '2026-06-03',
+                odometer: 5100,
+                brand: 'Toyota Genuine',
+                cost: 0,
+                notes: '1st Oil & Oil Filter Change completed at Toyota Township Motors.',
+                nextKm: 10000,
+                photo: null
+            },
+            {
+                id: 'log_pol_5000',
+                carId: 'yaris_2026',
+                category: 'detailing',
+                task: 'Double Layer Polishing (Coating + Wax)',
+                date: '2026-06-01',
+                odometer: 5000,
+                brand: 'Flamingo F112 + Formula 1 Wax',
+                cost: 0,
+                notes: 'Double layer polishing completed. Next time use Formula 1 Carnauba Wax after 24h curing of Flamingo F112 Nano Crystal Coating.',
+                nextKm: null,
+                photo: null
+            },
+            {
+                id: 'log_insp_1000',
+                carId: 'yaris_2026',
+                category: 'mechanical',
+                task: 'First Free Inspection',
+                date: '2026-03-15',
+                odometer: 1000,
+                brand: 'Toyota Genuine',
+                cost: 0,
+                notes: '1,000 km First Free Inspection completed.',
+                nextKm: 5000,
+                photo: null
+            }
+        ];
+
+        const MASTER_YARIS_DENTS = [
+            { id: 'dent_1', carId: 'yaris_2026', zone: 'Trunk / Rear', note: 'Scratch found during wash', severity: 'Scratch', cost: 0, status: 'pending', date: '10-Jun-2026', photo: null },
+            { id: 'dent_2', carId: 'yaris_2026', zone: 'Front R-Door', note: 'Light Scratch on door', severity: 'Scratch', cost: 0, status: 'pending', date: '12-Jun-2026', photo: null },
+            { id: 'dent_3', carId: 'yaris_2026', zone: 'Front L-Door', note: 'Clear coat scratch near door handle (fingernail does not catch)', severity: 'Scratch', cost: 0, status: 'pending', date: '12-Nov-2026', photo: null },
+            { id: 'dent_4', carId: 'yaris_2026', zone: 'Front Bumper', note: 'Mark and very minor dent on left side', severity: 'Minor Dent', cost: 0, status: 'pending', date: '12-Nov-2026', photo: null },
+            { id: 'dent_5', carId: 'yaris_2026', zone: 'Trunk / Rear', note: 'Slight dent on Rear Bumper', severity: 'Minor Dent', cost: 0, status: 'pending', date: '12-Nov-2026', photo: null }
+        ];
+
+        let state = {
+            activeCarId: 'yaris_2026',
+            activeCategory: 'water_wash',
+            selectedZone: 'Front Bumper',
+            dentFilter: 'all',
+            fuelMode: 'odo',
+            selectedLightId: 'coolant_blue',
+            editingCarMode: false,
+            tabHistory: ['log'],
+            tempLogPhoto: null,
+            tempDentPhoto: null,
+            tempFuelPhoto: null,
+            geminiApiKey: '',
+            backupEmail: '',
+            cars: [
+                {
+                    id: 'yaris_2026',
+                    name: 'Toyota Yaris Limited Edition',
+                    specs: '2026 MODEL • 1.3L CVT AUTOMATIC • BMU-951',
+                    odometer: 10534,
+                    banner: null
+                },
+                {
+                    id: 'cultus',
+                    name: 'Suzuki Cultus 2004',
+                    specs: '2004 MODEL • 1.0L MANUAL',
+                    odometer: 135000,
+                    banner: null
+                }
+            ],
+            customTasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)),
+            brands: [
+                'Toyota Genuine (TGMO 5W-30)',
+                'Flamingo',
+                'Formula 1 Carnauba Wax',
+                'Flamingo Crystal Coating F112',
+                'Jello Black Ice',
+                'Guard Filter',
+                'Caltex Havoline',
+                'Liqui Moly'
+            ],
+            savedNotes: [
+                'Wipe cloth cleaning. Routine work.',
+                'Checked battery distilled water & topped up both cells.',
+                'Main Radiator: 50ml. Coolant Reservoir: 250-300ml. Wiper Fluid: 2L with 3-4 drops shampoo.',
+                'Double layer polish: Flamingo F112 coating, 24h cure, then Formula 1 Carnauba Wax.',
+                'DIY Glass Cleaner: 1L water + 2-3 drops dishwash sprayed on microfiber cloth.',
+                'Tyre air pressure checked at 32 PSI on all 4 wheels.'
+            ],
+            logs: JSON.parse(JSON.stringify(MASTER_YARIS_LOGS)),
+            dents: JSON.parse(JSON.stringify(MASTER_YARIS_DENTS)),
+            fuelLogs: []
+        };
+
+        // IndexedDB Wrapper for Single Persistent Master Database
+        function saveToIndexedDB(dataObj) {
+            try {
+                const req = indexedDB.open(IDB_NAME, 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) {
+                        db.createObjectStore(IDB_STORE);
+                    }
+                };
+                req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).put(dataObj, 'master_record');
+                };
+            } catch (err) { console.warn('IDB error:', err); }
+        }
+
+        function ensureYarisHistoryMerged() {
+            // Normalize any old 'yaris' ID to 'yaris_2026'
+            state.cars.forEach(c => {
+                if (c.id === 'yaris') c.id = 'yaris_2026';
+                if (c.id === 'yaris_2026' && c.odometer < 10534) c.odometer = 10534;
+            });
+            if (state.activeCarId === 'yaris') state.activeCarId = 'yaris_2026';
+
+            state.logs.forEach(l => { if (l.carId === 'yaris') l.carId = 'yaris_2026'; });
+            state.dents.forEach(d => { if (d.carId === 'yaris') d.carId = 'yaris_2026'; });
+
+            // Guarantee all 7 preloaded Yaris records exist
+            const existingIds = new Set(state.logs.map(l => l.id));
+            MASTER_YARIS_LOGS.forEach(ml => {
+                if (!existingIds.has(ml.id)) {
+                    state.logs.push(ml);
+                }
+            });
+            state.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const existingDentIds = new Set(state.dents.map(d => d.id));
+            MASTER_YARIS_DENTS.forEach(md => {
+                if (!existingDentIds.has(md.id)) {
+                    state.dents.push(md);
+                }
+            });
+        }
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('autohub_pro_v5_db');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    state = Object.assign({}, state, parsed);
+                }
+                ensureYarisHistoryMerged();
+                saveState();
+            } catch (e) { console.error(e); }
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                saveToIndexedDB(state);
+            } catch (e) {
+                showToast('Storage limit reached! Keep photos compressed.');
+            }
+        }
+
+        function getActiveCar() {
+            return state.cars.find(c => c.id === state.activeCarId) || state.cars[0];
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            t.classList.remove('hidden');
+            t.classList.add('flex');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => {
+                t.classList.add('hidden');
+                t.classList.remove('flex');
+            }, 2800);
+        }
+
+        function triggerFileInput(inputId) {
+            const el = document.getElementById(inputId);
+            if (el) {
+                el.value = '';
+                el.click();
+            }
+        }
+
+        // Universal HEIC + High-Res Camera Photo Compressor (15KB - 35KB)
+        async function processAndCompressPhoto(file, maxW = 680, quality = 0.62) {
+            let workingBlob = file;
+            const fname = (file.name || '').toLowerCase();
+            const ftype = (file.type || '').toLowerCase();
+
+            // 1. Convert HEIC / HEIF if needed
+            if (fname.endsWith('.heic') || fname.endsWith('.heif') || ftype.includes('heic') || ftype.includes('heif')) {
+                if (window.heic2any) {
+                    showToast('Converting HEIC camera photo...');
+                    try {
+                        const converted = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.72 });
+                        workingBlob = Array.isArray(converted) ? converted[0] : converted;
+                    } catch (heicErr) {
+                        console.warn('heic2any fallback:', heicErr);
+                    }
+                }
+            }
+
+            // 2. Try modern createImageBitmap first (fastest & handles WebView blobs cleanly)
+            if (window.createImageBitmap) {
+                try {
+                    const bitmap = await createImageBitmap(workingBlob);
+                    const canvas = document.createElement('canvas');
+                    const scale = Math.min(1, maxW / bitmap.width);
+                    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    if (dataUrl && dataUrl.length > 100) return dataUrl;
+                } catch (bmpErr) {
+                    console.warn('createImageBitmap fallback to Image:', bmpErr);
+                }
+            }
+
+            // 3. Fallback to ObjectURL + HTMLImageElement
+            return new Promise((resolve, reject) => {
+                const objUrl = URL.createObjectURL(workingBlob);
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const scale = Math.min(1, maxW / img.width);
+                        canvas.width = Math.max(1, Math.round(img.width * scale));
+                        canvas.height = Math.max(1, Math.round(img.height * scale));
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        URL.revokeObjectURL(objUrl);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    } catch (err) {
+                        URL.revokeObjectURL(objUrl);
+                        reject(err);
+                    }
+                };
+                img.onerror = (err) => {
+                    URL.revokeObjectURL(objUrl);
+                    reject(err);
+                };
+                img.src = objUrl;
+            });
+        }
+
+        async function handlePhotoInput(event, targetType) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            try {
+                const maxW = targetType === 'car' ? 760 : 680;
+                const dataUrl = await processAndCompressPhoto(file, maxW, 0.62);
+                const sizeKB = Math.round((dataUrl.length * 3) / 4 / 1024);
+
+                if (targetType === 'car') {
+                    const car = getActiveCar();
+                    car.banner = dataUrl;
+                    saveState();
+                    renderHeroCard();
+                    const st = document.getElementById('car-photo-status');
+                    st.textContent = `✓ Saved (${sizeKB} KB)`;
+                    st.classList.remove('hidden');
+                    showToast(`Car photo updated (${sizeKB} KB)!`);
+                } else if (targetType === 'log') {
+                    state.tempLogPhoto = dataUrl;
+                    document.getElementById('log-photo-thumb').src = dataUrl;
+                    document.getElementById('log-photo-kb').textContent = `Compressed: ${sizeKB} KB • Tap to enlarge`;
+                    document.getElementById('log-photo-preview-box').classList.remove('hidden');
+                    document.getElementById('log-photo-status').textContent = `✓ ${sizeKB} KB`;
+                    document.getElementById('log-photo-status').classList.remove('hidden');
+                    showToast(`Receipt photo ready (${sizeKB} KB)!`);
+                } else if (targetType === 'dent') {
+                    state.tempDentPhoto = dataUrl;
+                    document.getElementById('dent-photo-thumb').src = dataUrl;
+                    document.getElementById('dent-photo-kb').textContent = `Compressed: ${sizeKB} KB • Tap to inspect`;
+                    document.getElementById('dent-photo-preview-box').classList.remove('hidden');
+                    showToast(`Dent photo attached (${sizeKB} KB)!`);
+                } else if (targetType === 'fuel') {
+                    state.tempFuelPhoto = dataUrl;
+                    document.getElementById('fuel-photo-thumb').src = dataUrl;
+                    document.getElementById('fuel-photo-kb').textContent = `Compressed: ${sizeKB} KB • Tap to inspect`;
+                    document.getElementById('fuel-photo-preview-box').classList.remove('hidden');
+                    showToast(`Fuel meter/receipt photo ready (${sizeKB} KB)!`);
+                }
+            } catch (err) {
+                console.error('Photo processing failed:', err);
+                showToast('Please select a standard JPG/PNG photo or use Camera.');
+            }
+        }
+
+        function clearAttachedPhoto(type) {
+            if (type === 'log') {
+                state.tempLogPhoto = null;
+                document.getElementById('log-photo-preview-box').classList.add('hidden');
+                document.getElementById('log-photo-status').classList.add('hidden');
+            } else if (type === 'dent') {
+                state.tempDentPhoto = null;
+                document.getElementById('dent-photo-preview-box').classList.add('hidden');
+            } else if (type === 'fuel') {
+                state.tempFuelPhoto = null;
+                document.getElementById('fuel-photo-preview-box').classList.add('hidden');
+            }
+        }
+
+        function previewFullImage(src, title) {
+            if (!src) return;
+            document.getElementById('modal-image-src').src = src;
+            document.getElementById('modal-image-title').textContent = title || 'Photo Preview';
+            openModal('modal-image');
+        }
+
+        // Gemini Vision AI Receipt & Meter Scanner
+        async function scanReceiptWithGemini(mode) {
+            const photoData = mode === 'log' ? state.tempLogPhoto : state.tempFuelPhoto;
+            if (!photoData) {
+                showToast('Please take or select a receipt photo first!');
+                return;
+            }
+            const apiKey = (state.geminiApiKey || document.getElementById('settings-gemini-key').value || '').trim();
+            if (!apiKey) {
+                switchTab('backup');
+                showToast('Paste your Google Gemini API Key in Backup Settings first!');
+                return;
+            }
+
+            const btn = document.getElementById(mode === 'log' ? 'btn-ai-scan-log' : 'btn-ai-scan-fuel');
+            const origText = btn.innerHTML;
+            btn.innerHTML = '<span>⏳</span><span>Scanning...</span>';
+
+            try {
+                const base64Clean = photoData.split(',')[1];
+                const promptText = mode === 'log'
+                    ? 'Extract automotive service invoice details into pure JSON with keys: date (YYYY-MM-DD), odometer (number), nextKm (number), cost (total payable number in PKR), brand (workshop or oil brand string), notes (concise summary of parts & labour).'
+                    : 'Extract fuel pump meter or petrol receipt details into pure JSON with keys: odometer (number), litres (number), bill (total amount number).';
+
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptText },
+                                { inline_data: { mime_type: 'image/jpeg', data: base64Clean } }
+                            ]
+                        }],
+                        generationConfig: { responseMimeType: 'application/json' }
+                    })
+                });
+                const json = await resp.json();
+                const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+                const parsed = JSON.parse(rawText);
+
+                if (mode === 'log') {
+                    if (parsed.date) document.getElementById('log-date').value = parsed.date;
+                    if (parsed.odometer) document.getElementById('log-odo').value = parsed.odometer;
+                    if (parsed.nextKm) document.getElementById('log-next-km').value = parsed.nextKm;
+                    if (parsed.cost) document.getElementById('log-cost').value = parsed.cost;
+                    if (parsed.brand) document.getElementById('log-brand').value = parsed.brand;
+                    if (parsed.notes) document.getElementById('log-notes').value = parsed.notes;
+                    showToast('AI Receipt Scan auto-filled the form!');
+                } else {
+                    if (parsed.odometer) document.getElementById('fuel-curr-odo').value = parsed.odometer;
+                    if (parsed.litres) document.getElementById('fuel-litres').value = parsed.litres;
+                    if (parsed.bill) document.getElementById('fuel-bill').value = parsed.bill;
+                    previewFuelCalc();
+                    showToast('AI Fuel Scan auto-filled readings!');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('AI Scan failed. Check internet or API key.');
+            } finally {
+                btn.innerHTML = origText;
+            }
+        }
+
+        function initApp() {
+            loadState();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('log-date').value = today;
+            document.getElementById('settings-gemini-key').value = state.geminiApiKey || '';
+            document.getElementById('settings-backup-email').value = state.backupEmail || '';
+
+            window.addEventListener('scroll', () => {
+                const btn = document.getElementById('btn-scroll-top');
+                if (window.scrollY > 260) {
+                    btn.classList.remove('hidden');
+                    btn.classList.add('flex');
+                } else {
+                    btn.classList.add('hidden');
+                    btn.classList.remove('flex');
+                }
+            });
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            }
+
+            renderAll();
+            setTimeout(checkAndNotifyRoutineAlerts, 1800);
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderAll() {
+            renderCarSelector();
+            renderHeroCard();
+            renderRoutineHealthStrip();
+            renderCategoryPills();
+            renderTaskOptions();
+            renderBrandChips();
+            renderSavedNotesUI();
+            renderBodyZones();
+            renderDentsList();
+            renderFuelSection();
+            renderHistory();
+            renderClusterLights();
+            renderGarageProfiles();
+        }
+
+        function renderCarSelector() {
+            const sel = document.getElementById('car-select');
+            sel.innerHTML = state.cars.map(c =>
+                `<option value="${c.id}" ${c.id === state.activeCarId ? 'selected' : ''}>${c.name}</option>`
+            ).join('');
+        }
+
+        function switchCar(carId) {
+            state.activeCarId = carId;
+            saveState();
+            renderAll();
+            showToast(`Switched to ${getActiveCar().name}`);
+        }
+
+        function renderHeroCard() {
+            const car = getActiveCar();
+            document.getElementById('hero-name').textContent = car.name;
+            document.getElementById('hero-engine').textContent = car.specs;
+            document.getElementById('stat-odo').textContent = Number(car.odometer).toLocaleString() + ' km';
+
+            const carLogs = state.logs.filter(l => l.carId === car.id);
+            const carFuel = state.fuelLogs.filter(f => f.carId === car.id);
+            const totalMaint = carLogs.reduce((s, l) => s + (Number(l.cost) || 0), 0);
+            const totalFuel = carFuel.reduce((s, f) => s + (Number(f.bill) || 0), 0);
+            document.getElementById('stat-spent').textContent = 'Rs ' + (totalMaint + totalFuel).toLocaleString();
+
+            if (carLogs.length > 0) {
+                const d = new Date(carLogs[0].date);
+                const shortDate = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                document.getElementById('stat-last').textContent = shortDate;
+            } else {
+                document.getElementById('stat-last').textContent = 'No Logs';
+            }
+
+            const banner = document.getElementById('hero-banner');
+            const overlay = document.getElementById('hero-overlay');
+            const thumb = document.getElementById('hero-car-thumb');
+            if (car.banner) {
+                banner.style.backgroundImage = `url(${car.banner})`;
+                overlay.classList.remove('hidden');
+                thumb.src = car.banner;
+                thumb.classList.remove('hidden');
+            } else {
+                banner.style.backgroundImage = '';
+                overlay.classList.add('hidden');
+                thumb.classList.add('hidden');
+            }
+
+            document.getElementById('log-odo').placeholder = `e.g. ${car.odometer}`;
+        }
+
+        // Routine Health Strip & Silent Background Alert Checker
+        function getRoutineItemStatus(item) {
+            const car = getActiveCar();
+            const carLogs = state.logs.filter(l => l.carId === car.id);
+            const match = carLogs.find(l =>
+                item.matchTasks.includes(l.task) ||
+                (l.notes && l.notes.toLowerCase().includes(item.label.toLowerCase()))
+            );
+            if (!match) {
+                return { daysAgo: null, isDue: true, lastDate: 'Never' };
+            }
+            const diffMs = Date.now() - new Date(match.date).getTime();
+            const daysAgo = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+            return {
+                daysAgo,
+                isDue: daysAgo >= item.maxDays,
+                lastDate: match.date,
+                lastLog: match
+            };
+        }
+
+        function renderRoutineHealthStrip() {
+            const box = document.getElementById('routine-chips-box');
+            let dueCount = 0;
+
+            box.innerHTML = ROUTINE_CHECK_ITEMS.map(item => {
+                const st = getRoutineItemStatus(item);
+                if (st.isDue) dueCount++;
+                const badgeColor = st.isDue
+                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                    : 'border-slate-700/80 bg-slate-100 dark:bg-[#09101f] text-emerald-400';
+                const subText = st.daysAgo === null ? 'Check Due' : `${st.daysAgo}d ago • ${st.isDue ? 'Due' : 'OK'}`;
+                return `
+                    <button type="button" onclick="openRoutineItemDrilldown('${item.id}')" class="px-3 py-2 rounded-2xl border ${badgeColor} flex items-center gap-2 shrink-0 active:scale-95 text-left">
+                        <span class="text-base">${item.icon}</span>
+                        <div>
+                            <div class="text-[11px] font-extrabold text-slate-900 dark:text-white flex items-center gap-1">${item.label} <span class="text-[9px] text-sky-400">↗</span></div>
+                            <div class="text-[10px] font-bold">${subText}</div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+
+            const badge = document.getElementById('routine-overall-badge');
+            if (dueCount > 0) {
+                badge.textContent = `${dueCount} Checkup Due`;
+                badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            } else {
+                badge.textContent = 'All Monitored ✓';
+                badge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+            }
+        }
+
+        function quickLogRoutineCheck() {
+            const val = document.getElementById('quick-routine-select').value;
+            const [taskName, catId] = val.split('|');
+            const car = getActiveCar();
+            const today = new Date().toISOString().split('T')[0];
+
+            state.logs.unshift({
+                id: 'log_' + Date.now(),
+                carId: car.id,
+                category: catId || 'water_wash',
+                task: taskName,
+                date: today,
+                odometer: car.odometer,
+                brand: 'Routine Check',
+                cost: 0,
+                notes: `${taskName} completed on ${today} at ${car.odometer.toLocaleString()} km.`,
+                nextKm: null,
+                photo: null
+            });
+
+            saveState();
+            renderAll();
+            showToast(`Logged: ${taskName}`);
+        }
+
+        function openRoutineItemDrilldown(itemId) {
+            const item = ROUTINE_CHECK_ITEMS.find(x => x.id === itemId);
+            if (!item) return;
+            const car = getActiveCar();
+            const history = state.logs.filter(l =>
+                l.carId === car.id &&
+                (item.matchTasks.includes(l.task) || (l.notes && l.notes.toLowerCase().includes(item.label.toLowerCase())))
+            );
+
+            document.getElementById('drilldown-title').textContent = `${item.icon} ${item.label} History`;
+            const body = document.getElementById('drilldown-body');
+            body.innerHTML = `
+                <div class="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-3 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-extrabold text-white">Recommended Interval: Every ${item.maxDays} Days</div>
+                        <div class="text-[11px] text-slate-400">Tap button to mark ${item.label} checked today</div>
+                    </div>
+                    <button onclick="quickLogFromModal('${item.matchTasks[0]}')" class="bg-emerald-500 text-slate-950 font-extrabold text-xs px-3 py-2 rounded-xl shrink-0">✓ Mark Done Today</button>
+                </div>
+                ${history.length === 0 ? `<div class="text-center text-xs text-slate-400 py-6">No past logs found for ${item.label}.</div>` : history.map(h => `
+                    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-1">
+                        <div class="flex items-center justify-between text-xs font-extrabold text-sky-400">
+                            <span>${h.task}</span>
+                            <span>${h.date}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400">Odometer: ${Number(h.odometer).toLocaleString()} km</div>
+                        <p class="text-xs text-slate-200">${h.notes || ''}</p>
+                    </div>
+                `).join('')}
+            `;
+            openModal('modal-drilldown');
+        }
+
+        function quickLogFromModal(taskName) {
+            const car = getActiveCar();
+            const today = new Date().toISOString().split('T')[0];
+            state.logs.unshift({
+                id: 'log_' + Date.now(),
+                carId: car.id,
+                category: 'water_wash',
+                task: taskName,
+                date: today,
+                odometer: car.odometer,
+                brand: 'Routine Check',
+                cost: 0,
+                notes: `${taskName} verified OK.`,
+                nextKm: null,
+                photo: null
+            });
+            saveState();
+            renderAll();
+            closeModal('modal-drilldown');
+            showToast(`${taskName} logged for today!`);
+        }
+
+        // Expense Breakdown Modal & Last Check Jump
+        function openExpenseModal() {
+            const car = getActiveCar();
+            const carLogs = state.logs.filter(l => l.carId === car.id && Number(l.cost) > 0);
+            const carFuel = state.fuelLogs.filter(f => f.carId === car.id && Number(f.bill) > 0);
+            const totalMaint = carLogs.reduce((s, l) => s + Number(l.cost), 0);
+            const totalFuel = carFuel.reduce((s, f) => s + Number(f.bill), 0);
+
+            document.getElementById('drilldown-title').textContent = '📊 Total Expense Breakdown';
+            document.getElementById('drilldown-body').innerHTML = `
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-bold">MAINTENANCE SPENT</div>
+                        <div class="text-sm font-extrabold text-sky-400">Rs ${totalMaint.toLocaleString()}</div>
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-bold">FUEL SPENT</div>
+                        <div class="text-sm font-extrabold text-amber-400">Rs ${totalFuel.toLocaleString()}</div>
+                    </div>
+                </div>
+                <div class="space-y-2 pt-2">
+                    <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">PAID SERVICE & PART INVOICES</div>
+                    ${carLogs.length === 0 ? `<div class="text-xs text-slate-400 py-4 text-center">No paid bills logged yet.</div>` : carLogs.map(l => `
+                        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold text-white">${l.task}</span>
+                                <span class="text-xs font-extrabold text-emerald-400">Rs ${Number(l.cost).toLocaleString()}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400">${l.date} • ${Number(l.odometer).toLocaleString()} km • ${l.brand || ''}</div>
+                            <p class="text-[11px] text-slate-300">${l.notes || ''}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            openModal('modal-drilldown');
+        }
+
+        function jumpToLatestHistory() {
+            switchTab('history');
+        }
+
+        // Odometer Modal
+        function openOdometerModal(targetCarId) {
+            window._odoTargetCarId = targetCarId || state.activeCarId;
+            const car = state.cars.find(c => c.id === window._odoTargetCarId) || getActiveCar();
+            document.getElementById('modal-odo-sub').textContent = `Set or reset present meter reading for ${car.name}:`;
+            document.getElementById('modal-odo-input').value = car.odometer;
+            openModal('modal-odo');
+        }
+
+        function confirmOdometerSave() {
+            const val = Number(document.getElementById('modal-odo-input').value);
+            if (isNaN(val) || val < 0) return;
+            const car = state.cars.find(c => c.id === (window._odoTargetCarId || state.activeCarId)) || getActiveCar();
+            car.odometer = val;
+            document.getElementById('log-odo').value = val;
+            document.getElementById('fuel-prev-odo').value = val;
+            saveState();
+            renderAll();
+            closeModal('modal-odo');
+            showToast(`Odometer updated to ${val.toLocaleString()} km!`);
+        }
+
+        // Categories, Tasks & Saved Notes Dropdown
+        function renderCategoryPills() {
+            const container = document.getElementById('category-pills');
+            container.innerHTML = DEFAULT_CATEGORIES.map(c => `
+                <button type="button" onclick="selectCategory('${c.id}')" class="px-3.5 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap border transition-all ${state.activeCategory === c.id ? 'pill-active' : 'bg-slate-100 dark:bg-[#09101f] border-slate-300 dark:border-slate-700/80 text-slate-400'}">
+                    ${c.label}
+                </button>
+            `).join('');
+        }
+
+        function selectCategory(catId) {
+            state.activeCategory = catId;
+            renderCategoryPills();
+            renderTaskOptions();
+        }
+
+        function renderTaskOptions() {
+            const sel = document.getElementById('log-task');
+            const list = state.customTasks[state.activeCategory] || [];
+            sel.innerHTML = list.map(t => `<option value="${t}">${t}</option>`).join('');
+            onTaskChange();
+        }
+
+        function onTaskChange() {
+            const task = document.getElementById('log-task').value;
+            const car = getActiveCar();
+            const prev = state.logs.find(l => l.carId === car.id && l.task === task);
+            const banner = document.getElementById('prev-note-banner');
+            if (prev) {
+                banner.classList.remove('hidden');
+                document.getElementById('prev-note-title').textContent = `LAST DONE: ${prev.date} (${Number(prev.odometer).toLocaleString()} KM)`;
+                document.getElementById('prev-note-text').textContent = `${prev.brand ? '[' + prev.brand + '] ' : ''}${prev.notes || 'Completed checkup'}`;
+                window._lastFoundPrev = prev;
+            } else {
+                banner.classList.add('hidden');
+                window._lastFoundPrev = null;
+            }
+        }
+
+        function applyPrevNote() {
+            if (!window._lastFoundPrev) return;
+            if (window._lastFoundPrev.brand) document.getElementById('log-brand').value = window._lastFoundPrev.brand;
+            if (window._lastFoundPrev.notes) document.getElementById('log-notes').value = window._lastFoundPrev.notes;
+            showToast('Previous note & brand applied!');
+        }
+
+        function renderBrandChips() {
+            const box = document.getElementById('brand-chips');
+            box.innerHTML = state.brands.map(b => `
+                <button type="button" onclick="document.getElementById('log-brand').value='${b.replace(/'/g, "\'")}'" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-[#09101f] border border-slate-300 dark:border-slate-700/80 text-[11px] font-bold text-slate-300 whitespace-nowrap active:scale-95 hover:border-sky-500">
+                    ${b}
+                </button>
+            `).join('');
+        }
+
+        function renderSavedNotesUI() {
+            const dd = document.getElementById('saved-notes-dropdown');
+            dd.innerHTML = `<option value="">📋 Select a Previously Saved Note (${state.savedNotes.length} available)...</option>` +
+                state.savedNotes.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+
+            const chips = document.getElementById('note-chips');
+            chips.innerHTML = state.savedNotes.map((n, idx) => `
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/30 text-[11px] font-semibold text-sky-300 whitespace-nowrap">
+                    <span onclick="useNoteChip(${idx})" class="cursor-pointer">${n.length > 42 ? n.slice(0, 42) + '...' : n}</span>
+                    <button type="button" onclick="removeNoteChip(${idx})" class="text-slate-400 hover:text-rose-400 font-bold">×</button>
+                </div>
+            `).join('');
+        }
+
+        function onSelectSavedNoteDropdown(sel) {
+            if (sel.value === '') return;
+            const idx = Number(sel.value);
+            const txt = state.savedNotes[idx];
+            if (txt) {
+                const area = document.getElementById('log-notes');
+                area.value = area.value ? area.value + ' | ' + txt : txt;
+                showToast('Saved note inserted!');
+            }
+            sel.value = '';
+        }
+
+        function useNoteChip(idx) {
+            const txt = state.savedNotes[idx];
+            const area = document.getElementById('log-notes');
+            area.value = area.value ? area.value + ' | ' + txt : txt;
+        }
+
+        function removeNoteChip(idx) {
+            state.savedNotes.splice(idx, 1);
+            saveState();
+            renderSavedNotesUI();
+        }
+
+        function pinCurrentNote() {
+            const val = document.getElementById('log-notes').value.trim();
+            if (!val) {
+                showToast('Write a note first to pin it to dropdown!');
+                return;
+            }
+            if (!state.savedNotes.includes(val)) {
+                state.savedNotes.unshift(val);
+                saveState();
+                renderSavedNotesUI();
+                showToast('Note saved to dropdown & chips!');
+            }
+        }
+
+        function saveMaintenanceLog() {
+            const car = getActiveCar();
+            const task = document.getElementById('log-task').value;
+            const date = document.getElementById('log-date').value || new Date().toISOString().split('T')[0];
+            const odoInput = document.getElementById('log-odo').value;
+            const odo = odoInput ? Number(odoInput) : car.odometer;
+            const brand = document.getElementById('log-brand').value.trim();
+            const cost = Number(document.getElementById('log-cost').value) || 0;
+            const notes = document.getElementById('log-notes').value.trim();
+            const nextKm = document.getElementById('log-next-km').value ? Number(document.getElementById('log-next-km').value) : null;
+
+            state.logs.unshift({
+                id: 'log_' + Date.now(),
+                carId: car.id,
+                category: state.activeCategory,
+                task,
+                date,
+                odometer: odo,
+                brand,
+                cost,
+                notes,
+                nextKm,
+                photo: state.tempLogPhoto
+            });
+
+            if (odo > car.odometer) car.odometer = odo;
+            if (notes && !state.savedNotes.includes(notes)) {
+                state.savedNotes.unshift(notes);
+            }
+            if (brand && !state.brands.includes(brand)) {
+                state.brands.unshift(brand);
+            }
+
+            clearAttachedPhoto('log');
+            document.getElementById('log-cost').value = '';
+            document.getElementById('log-notes').value = '';
+            document.getElementById('log-next-km').value = '';
+
+            saveState();
+            renderAll();
+            showToast('Record saved to Master Database!');
+        }
+
+        // Dents Mapper
+        function renderBodyZones() {
+            const grid = document.getElementById('body-zone-grid');
+            grid.innerHTML = BODY_ZONES.map(z => `
+                <button type="button" onclick="selectBodyZone('${z}')" class="py-2.5 px-2 rounded-xl text-[11px] font-bold border transition-all truncate ${state.selectedZone === z ? 'zone-active' : 'bg-white dark:bg-[#111a2e] border-slate-300 dark:border-slate-700/80 text-slate-300'}">
+                    ${z}
+                </button>
+            `).join('');
+            document.getElementById('selected-zone-badge').textContent = state.selectedZone;
+        }
+
+        function selectBodyZone(z) {
+            state.selectedZone = z;
+            renderBodyZones();
+        }
+
+        function saveDentLog() {
+            const car = getActiveCar();
+            const note = document.getElementById('dent-note').value.trim() || `${state.selectedZone} mark`;
+            const severity = document.getElementById('dent-severity').value;
+            const cost = Number(document.getElementById('dent-cost').value) || 0;
+
+            state.dents.unshift({
+                id: 'dent_' + Date.now(),
+                carId: car.id,
+                zone: state.selectedZone,
+                note,
+                severity,
+                cost,
+                status: 'pending',
+                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                photo: state.tempDentPhoto
+            });
+
+            clearAttachedPhoto('dent');
+            document.getElementById('dent-note').value = '';
+            document.getElementById('dent-cost').value = '';
+
+            saveState();
+            renderDentsList();
+            showToast(`Saved ${state.selectedZone} (${severity})`);
+        }
+
+        function setDentFilter(f) {
+            state.dentFilter = f;
+            ['all', 'pending', 'fixed'].forEach(k => {
+                const btn = document.getElementById('df-' + k);
+                btn.className = k === f
+                    ? 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500 text-white'
+                    : 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-[#111a2e] text-slate-400';
+            });
+            renderDentsList();
+        }
+
+        function toggleDentStatus(id, ev) {
+            if (ev) ev.stopPropagation();
+            const d = state.dents.find(x => x.id === id);
+            if (!d) return;
+            d.status = d.status === 'pending' ? 'fixed' : 'pending';
+            saveState();
+            renderDentsList();
+            showToast(d.status === 'fixed' ? 'Marked Fixed!' : 'Marked Pending');
+        }
+
+        function deleteDent(id, ev) {
+            if (ev) ev.stopPropagation();
+            state.dents = state.dents.filter(x => x.id !== id);
+            saveState();
+            renderDentsList();
+        }
+
+        function renderDentsList() {
+            const car = getActiveCar();
+            let list = state.dents.filter(d => d.carId === car.id);
+            if (state.dentFilter !== 'all') list = list.filter(d => d.status === state.dentFilter);
+            const box = document.getElementById('dent-list');
+            if (list.length === 0) {
+                box.innerHTML = `<div class="glass-card rounded-2xl p-6 text-center text-xs text-slate-400">No body dents or scratches in this filter.</div>`;
+                return;
+            }
+            box.innerHTML = list.map(d => `
+                <div onclick="openDentDetailModal('${d.id}')" class="glass-card rounded-2xl p-3.5 flex gap-3 items-start cursor-pointer active:scale-99">
+                    ${d.photo ? `<img src="${d.photo}" class="w-14 h-14 rounded-xl object-cover border border-slate-700 shrink-0">` : `<div class="w-12 h-12 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-base shrink-0">🚗</div>`}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1 mb-1">
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-400">${d.zone} • ${d.severity}</span>
+                            <span class="text-[10px] text-slate-400">${d.date}</span>
+                        </div>
+                        <p class="text-xs font-bold text-slate-200">${d.note}</p>
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="text-[11px] font-bold text-slate-400">${d.cost ? 'Est. Rs ' + d.cost.toLocaleString() : 'Tap for details'}</span>
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleDentStatus('${d.id}', event)" class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold ${d.status === 'fixed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
+                                    ${d.status === 'fixed' ? '✓ Fixed' : 'Mark Fixed'}
+                                </button>
+                                <button onclick="deleteDent('${d.id}', event)" class="text-xs text-rose-400 font-bold px-1">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openDentDetailModal(dentId) {
+            const d = state.dents.find(x => x.id === dentId);
+            if (!d) return;
+            const zoneHistory = state.dents.filter(x => x.carId === d.carId && x.zone === d.zone);
+            document.getElementById('drilldown-title').textContent = `🚗 ${d.zone} Details`;
+            document.getElementById('drilldown-body').innerHTML = `
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-extrabold text-orange-400">${d.zone} (${d.severity})</span>
+                        <span class="text-xs text-slate-400">${d.date}</span>
+                    </div>
+                    <p class="text-xs text-white leading-relaxed">${d.note}</p>
+                    ${d.photo ? `<img src="${d.photo}" onclick="previewFullImage(this.src, '${d.zone}')" class="w-full max-h-56 object-cover rounded-xl border border-slate-700 cursor-pointer">` : ''}
+                </div>
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 pt-2">ALL MARKS ON ${d.zone.toUpperCase()} (${zoneHistory.length})</div>
+                ${zoneHistory.map(z => `
+                    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                        <span>${z.note}</span>
+                        <span class="text-[10px] text-slate-400">${z.date}</span>
+                    </div>
+                `).join('')}
+            `;
+            openModal('modal-drilldown');
+        }
+
+        // Fuel Tracker
+        function toggleFuelMode() {
+            state.fuelMode = state.fuelMode === 'odo' ? 'trip' : 'odo';
+            document.getElementById('fuel-odo-inputs').classList.toggle('hidden', state.fuelMode !== 'odo');
+            document.getElementById('fuel-trip-inputs').classList.toggle('hidden', state.fuelMode !== 'trip');
+            document.getElementById('fuel-mode-btn').textContent = state.fuelMode === 'odo' ? 'Switch to Trip Mode' : 'Switch to Odometer Mode';
+            previewFuelCalc();
+        }
+
+        function previewFuelCalc() {
+            let dist = 0;
+            if (state.fuelMode === 'odo') {
+                const prev = Number(document.getElementById('fuel-prev-odo').value) || 0;
+                const curr = Number(document.getElementById('fuel-curr-odo').value) || 0;
+                dist = curr - prev;
+            } else {
+                dist = Number(document.getElementById('fuel-trip-dist').value) || 0;
+            }
+            const litres = Number(document.getElementById('fuel-litres').value) || 0;
+            const bar = document.getElementById('fuel-live-preview');
+            if (dist > 0) {
+                bar.classList.remove('hidden');
+                document.getElementById('fuel-live-dist').textContent = `Driven: ${dist.toFixed(1)} km`;
+                document.getElementById('fuel-live-avg').textContent = litres > 0 ? `${(dist / litres).toFixed(2)} km/L` : '-- km/L';
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        function saveFuelLog() {
+            const car = getActiveCar();
+            let dist = 0;
+            let currOdo = car.odometer;
+            if (state.fuelMode === 'odo') {
+                const prev = Number(document.getElementById('fuel-prev-odo').value) || car.odometer;
+                currOdo = Number(document.getElementById('fuel-curr-odo').value) || 0;
+                dist = currOdo - prev;
+            } else {
+                dist = Number(document.getElementById('fuel-trip-dist').value) || 0;
+                currOdo = car.odometer + dist;
+            }
+            const litres = Number(document.getElementById('fuel-litres').value) || 0;
+            const bill = Number(document.getElementById('fuel-bill').value) || 0;
+
+            if (dist <= 0 || litres <= 0) {
+                showToast('Enter valid odometer distance & litres!');
+                return;
+            }
+
+            const avg = Number((dist / litres).toFixed(2));
+            state.fuelLogs.unshift({
+                id: 'fuel_' + Date.now(),
+                carId: car.id,
+                date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                odometer: currOdo,
+                distance: dist,
+                litres,
+                bill,
+                avg,
+                photo: state.tempFuelPhoto
+            });
+
+            if (currOdo > car.odometer) car.odometer = currOdo;
+            clearAttachedPhoto('fuel');
+            document.getElementById('fuel-curr-odo').value = '';
+            document.getElementById('fuel-trip-dist').value = '';
+            document.getElementById('fuel-litres').value = '';
+            document.getElementById('fuel-bill').value = '';
+            document.getElementById('fuel-live-preview').classList.add('hidden');
+
+            saveState();
+            renderAll();
+            showToast(`Fuel Avg ${avg.toFixed(2)} km/L saved!`);
+        }
+
+        function renderFuelSection() {
+            const car = getActiveCar();
+            document.getElementById('fuel-prev-odo').value = car.odometer;
+            const logs = state.fuelLogs.filter(f => f.carId === car.id);
+            if (logs.length > 0) {
+                const latest = logs[0];
+                const best = Math.max(...logs.map(x => x.avg));
+                document.getElementById('fuel-latest-avg').textContent = `${latest.avg.toFixed(2)} km/L`;
+                document.getElementById('fuel-best-avg').textContent = `${best.toFixed(2)} km/L`;
+                document.getElementById('fuel-cost-km').textContent = latest.bill > 0 ? `Rs ${(latest.bill / latest.distance).toFixed(1)}` : 'Rs --';
+            } else {
+                document.getElementById('fuel-latest-avg').textContent = '-- km/L';
+                document.getElementById('fuel-best-avg').textContent = '-- km/L';
+                document.getElementById('fuel-cost-km').textContent = 'Rs --';
+            }
+
+            document.getElementById('fuel-history-list').innerHTML = logs.map(f => `
+                <div class="glass-card rounded-2xl p-3.5 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        ${f.photo ? `<img src="${f.photo}" onclick="previewFullImage(this.src, 'Fuel Receipt')" class="w-11 h-11 rounded-lg object-cover border border-slate-700 cursor-pointer">` : ''}
+                        <div>
+                            <div class="text-xs font-extrabold text-white">${f.distance.toFixed(1)} km (${f.litres} L)</div>
+                            <div class="text-[11px] text-slate-400">Odo: ${Number(f.odometer).toLocaleString()} km • ${f.date}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-extrabold text-emerald-400">${f.avg.toFixed(2)} km/L</div>
+                        <div class="text-[11px] text-slate-400">Rs ${Number(f.bill).toLocaleString()}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // History Section & Drill-down Modal
+        function renderHistory() {
+            const car = getActiveCar();
+            const q = (document.getElementById('hist-search').value || '').toLowerCase();
+            const cat = document.getElementById('hist-filter').value;
+
+            let list = state.logs.filter(l => l.carId === car.id);
+            if (cat !== 'all') list = list.filter(l => l.category === cat);
+            if (q) {
+                list = list.filter(l =>
+                    (l.task && l.task.toLowerCase().includes(q)) ||
+                    (l.brand && l.brand.toLowerCase().includes(q)) ||
+                    (l.notes && l.notes.toLowerCase().includes(q))
+                );
+            }
+
+            document.getElementById('hist-count-badge').textContent = `${list.length} Records`;
+            const box = document.getElementById('history-list');
+            if (list.length === 0) {
+                box.innerHTML = `<div class="glass-card rounded-2xl p-6 text-center text-xs text-slate-400">No maintenance logs match your filter.</div>`;
+                return;
+            }
+
+            const catLabels = {
+                water_wash: '💧 WATER & DAILY WASH',
+                fluids: '🛢️ FLUIDS & FILTERS',
+                detailing: '✨ POLISHING & DETAILING',
+                mechanical: '🔧 MECHANICAL & TUNING'
+            };
+
+            box.innerHTML = list.map(l => {
+                const d = new Date(l.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                return `
+                <div onclick="openTaskDrilldown('${l.task.replace(/'/g, "\'")}', '${l.id}')" class="glass-card rounded-2xl p-3.5 space-y-2 cursor-pointer hover:border-sky-500/40 active:scale-99 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-400">${catLabels[l.category] || 'MAINTENANCE'}</span>
+                        <span class="text-[11px] text-slate-400 font-semibold">${d} ↗</span>
+                    </div>
+                    <div class="text-sm font-extrabold text-slate-900 dark:text-white">${l.task}</div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${l.brand ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30">${l.brand}</span>` : ''}
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-sky-300">${Number(l.odometer).toLocaleString()} km</span>
+                        ${l.cost > 0 ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300">Rs ${Number(l.cost).toLocaleString()}</span>` : ''}
+                        ${l.nextKm ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300">Next: ${Number(l.nextKm).toLocaleString()} km</span>` : ''}
+                    </div>
+                    ${l.notes ? `<p class="text-xs text-slate-300 leading-relaxed">${l.notes}</p>` : ''}
+                    ${l.photo ? `<img src="${l.photo}" onclick="event.stopPropagation(); previewFullImage(this.src, '${l.task.replace(/'/g, "\'")}')" class="w-full max-h-44 object-cover rounded-xl border border-slate-700 mt-1">` : ''}
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[10px] font-bold text-sky-400">Tap card for full item timeline</span>
+                        <button onclick="event.stopPropagation(); deleteLog('${l.id}')" class="text-[11px] font-bold text-rose-400">Delete</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function openTaskDrilldown(taskName, highlightId) {
+            const car = getActiveCar();
+            const sameTaskLogs = state.logs.filter(l => l.carId === car.id && l.task === taskName);
+            document.getElementById('drilldown-title').textContent = taskName;
+            document.getElementById('drilldown-body').innerHTML = `
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">COMPLETE TIMELINE FOR THIS TASK (${sameTaskLogs.length} RECORDS)</div>
+                ${sameTaskLogs.map(l => `
+                    <div class="bg-slate-900 border ${l.id === highlightId ? 'border-sky-500' : 'border-slate-800'} rounded-2xl p-3.5 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs font-extrabold text-white">
+                            <span>📅 ${l.date}</span>
+                            <span class="text-sky-400">${Number(l.odometer).toLocaleString()} km</span>
+                        </div>
+                        ${l.brand || l.cost ? `<div class="text-[11px] text-emerald-400 font-bold">${l.brand || ''} ${l.cost ? '• Rs ' + Number(l.cost).toLocaleString() : ''}</div>` : ''}
+                        <p class="text-xs text-slate-300 leading-relaxed">${l.notes || 'Completed.'}</p>
+                        ${l.photo ? `<img src="${l.photo}" onclick="previewFullImage(this.src, '${l.task.replace(/'/g, "\'")}')" class="w-full max-h-52 object-cover rounded-xl border border-slate-700 mt-1 cursor-pointer">` : ''}
+                    </div>
+                `).join('')}
+            `;
+            openModal('modal-drilldown');
+        }
+
+        function deleteLog(id) {
+            state.logs = state.logs.filter(l => l.id !== id);
+            saveState();
+            renderAll();
+            showToast('Record deleted');
+        }
+
+        // Guides & Cluster Lights
+        function switchGuideSubTab(sub) {
+            document.getElementById('guide-lights-panel').classList.toggle('hidden', sub !== 'lights');
+            document.getElementById('guide-sops-panel').classList.toggle('hidden', sub !== 'sops');
+            document.getElementById('gsub-lights').className = sub === 'lights' ? 'py-2 rounded-xl text-xs font-extrabold pill-active' : 'py-2 rounded-xl text-xs font-extrabold text-slate-400';
+            document.getElementById('gsub-sops').className = sub === 'sops' ? 'py-2 rounded-xl text-xs font-extrabold pill-active' : 'py-2 rounded-xl text-xs font-extrabold text-slate-400';
+        }
+
+        function renderClusterLights() {
+            const car = getActiveCar();
+            const isCultus = car.id === 'cultus' || car.name.toLowerCase().includes('cultus');
+            document.getElementById('yaris-cluster-box').classList.toggle('hidden', isCultus);
+            document.getElementById('cultus-cluster-box').classList.toggle('hidden', !isCultus);
+
+            const grid = document.getElementById('cluster-lights-grid');
+            grid.innerHTML = YARIS_LIGHTS.map(item => `
+                <button type="button" onclick="selectClusterLight('${item.id}')" class="p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 bg-slate-100 dark:bg-[#09101f] border-slate-300 dark:border-slate-800 ${state.selectedLightId === item.id ? 'light-active' : ''}">
+                    <span class="text-xl">${item.icon}</span>
+                    <span class="text-[11px] font-extrabold ${item.color}">${item.name}</span>
+                    <span class="text-[9px] text-slate-400">${item.sub}</span>
+                </button>
+            `).join('');
+
+            const activeLight = YARIS_LIGHTS.find(x => x.id === state.selectedLightId) || YARIS_LIGHTS[0];
+            document.getElementById('cluster-light-detail').innerHTML = `
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-extrabold ${activeLight.color}">${activeLight.title}</span>
+                    <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 shrink-0">${activeLight.badge}</span>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">${activeLight.desc}</p>
+            `;
+        }
+
+        function selectClusterLight(id) {
+            state.selectedLightId = id;
+            renderClusterLights();
+        }
+
+        // Single Master File Overwrite, Cloud Share & Silent Notifications
+        async function overwriteSingleMasterFile() {
+            const dataStr = JSON.stringify(state, null, 2);
+            try {
+                if (window.showSaveFilePicker) {
+                    if (!window._masterFileHandle) {
+                        window._masterFileHandle = await window.showSaveFilePicker({
+                            suggestedName: 'AutoHub_Master_DB.json',
+                            types: [{ description: 'JSON Database', accept: { 'application/json': ['.json'] } }]
+                        });
+                    }
+                    const writable = await window._masterFileHandle.createWritable();
+                    await writable.write(dataStr);
+                    await writable.close();
+                    showToast('Single Master File updated in-place!');
+                    return;
+                }
+            } catch (err) {
+                console.warn('FilePicker fallback:', err);
+            }
+            // Fallback with fixed single filename (no date suffix)
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AutoHub_Master_DB.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Saved AutoHub_Master_DB.json');
+        }
+
+        async function shareDatabaseToCloud() {
+            const dataStr = JSON.stringify(state, null, 2);
+            const file = new File([dataStr], 'AutoHub_Master_DB.json', { type: 'application/json' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        title: 'AutoHub PRO Master Database',
+                        text: `Toyota Yaris Limited Edition (${getActiveCar().odometer} km) Garage Backup`,
+                        files: [file]
+                    });
+                    showToast('Shared to Cloud / Drive!');
+                    return;
+                } catch (e) {}
+            }
+            overwriteSingleMasterFile();
+        }
+
+        function emailDatabaseSummary() {
+            const email = (state.backupEmail || document.getElementById('settings-backup-email').value || '').trim();
+            const car = getActiveCar();
+            const subject = encodeURIComponent(`AutoHub PRO Backup - ${car.name} (${car.odometer} km)`);
+            const body = encodeURIComponent(
+                `Vehicle: ${car.name}
+Odometer: ${car.odometer} km
+Total Logs: ${state.logs.length}
+
+Latest Log: ${state.logs[0]?.date} - ${state.logs[0]?.task}
+
+(Attach or paste AutoHub_Master_DB.json for full restore)`
+            );
+            window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+        }
+
+        function saveAppSettings() {
+            state.geminiApiKey = document.getElementById('settings-gemini-key').value.trim();
+            state.backupEmail = document.getElementById('settings-backup-email').value.trim();
+            saveState();
+            showToast('Settings saved to Master DB!');
+        }
+
+        async function enableSilentNotifications() {
+            if (!('Notification' in window)) {
+                showToast('Notifications supported inside installed APK.');
+                return;
+            }
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') {
+                document.getElementById('btn-notif-perm').textContent = 'Alerts Active ✓';
+                checkAndNotifyRoutineAlerts(true);
+                showToast('Silent Background Alerts enabled!');
+            } else {
+                showToast('Please allow notification permission in Android settings.');
+            }
+        }
+
+        function checkAndNotifyRoutineAlerts(forceShow) {
+            const dueNames = [];
+            ROUTINE_CHECK_ITEMS.forEach(item => {
+                const st = getRoutineItemStatus(item);
+                if (st.isDue) dueNames.push(item.label);
+            });
+            if ((dueNames.length > 0 || forceShow) && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+                navigator.serviceWorker.ready.then(reg => {
+                    if (reg.active) {
+                        reg.active.postMessage({
+                            type: 'CHECK_ROUTINE_ALERTS',
+                            dueItems: dueNames.length > 0 ? dueNames : ['All 15-day routine checks are up to date ✓']
+                        });
+                    }
+                });
+            }
+        }
+
+        function importDatabaseJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const imported = JSON.parse(ev.target.result);
+                    if (imported && imported.cars) {
+                        state = Object.assign({}, state, imported);
+                        ensureYarisHistoryMerged();
+                        saveState();
+                        renderAll();
+                        showToast('Master Database restored & merged!');
+                    }
+                } catch (err) {
+                    showToast('Invalid JSON file');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Custom Modals & Garage Profiles
+        function openAddItemModal() {
+            document.getElementById('new-item-cat').value = state.activeCategory;
+            document.getElementById('new-item-name').value = '';
+            openModal('modal-add-item');
+        }
+
+        function confirmAddCustomItem() {
+            const cat = document.getElementById('new-item-cat').value;
+            const name = document.getElementById('new-item-name').value.trim();
+            if (!name) return;
+            if (!state.customTasks[cat]) state.customTasks[cat] = [];
+            if (!state.customTasks[cat].includes(name)) state.customTasks[cat].unshift(name);
+            state.activeCategory = cat;
+            saveState();
+            renderCategoryPills();
+            renderTaskOptions();
+            document.getElementById('log-task').value = name;
+            onTaskChange();
+            closeModal('modal-add-item');
+            showToast(`Added "${name}"`);
+        }
+
+        function openAddBrandModal() {
+            document.getElementById('new-brand-name').value = '';
+            openModal('modal-add-brand');
+        }
+
+        function confirmAddBrand() {
+            const b = document.getElementById('new-brand-name').value.trim();
+            if (!b) return;
+            if (!state.brands.includes(b)) state.brands.unshift(b);
+            saveState();
+            renderBrandChips();
+            document.getElementById('log-brand').value = b;
+            closeModal('modal-add-brand');
+            showToast(`Brand "${b}" saved!`);
+        }
+
+        function renderGarageProfiles() {
+            const box = document.getElementById('garage-profiles-list');
+            box.innerHTML = state.cars.map(c => `
+                <div class="bg-slate-100 dark:bg-[#09101f] border ${c.id === state.activeCarId ? 'border-sky-500/60' : 'border-slate-300 dark:border-slate-800'} rounded-2xl p-3 flex items-center justify-between gap-2">
+                    <div onclick="switchCar('${c.id}')" class="cursor-pointer flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs font-extrabold truncate">${c.name}</span>
+                            ${c.id === state.activeCarId ? '<span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-sky-500 text-white">ACTIVE</span>' : ''}
+                        </div>
+                        <div class="text-[10px] text-slate-400 truncate">${c.specs} • <span class="text-sky-400 font-bold">${Number(c.odometer).toLocaleString()} km</span></div>
+                    </div>
+                    <button onclick="openOdometerModal('${c.id}')" class="px-2.5 py-1.5 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-extrabold shrink-0">
+                        Set Odo
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function openAddCarModal() {
+            state.editingCarMode = false;
+            document.getElementById('modal-car-title').textContent = '🚘 Add New Vehicle';
+            document.getElementById('car-form-name').value = '';
+            document.getElementById('car-form-specs').value = '';
+            document.getElementById('car-form-odo').value = '';
+            openModal('modal-car');
+        }
+
+        function openEditCarModal() {
+            const car = getActiveCar();
+            state.editingCarMode = true;
+            document.getElementById('modal-car-title').textContent = '✎ Edit Vehicle Profile';
+            document.getElementById('car-form-name').value = car.name;
+            document.getElementById('car-form-specs').value = car.specs;
+            document.getElementById('car-form-odo').value = car.odometer;
+            openModal('modal-car');
+        }
+
+        function confirmSaveCar() {
+            const name = document.getElementById('car-form-name').value.trim();
+            const specs = document.getElementById('car-form-specs').value.trim() || 'Custom Garage Profile';
+            const odo = Number(document.getElementById('car-form-odo').value) || 0;
+            if (!name) return;
+
+            if (state.editingCarMode) {
+                const car = getActiveCar();
+                car.name = name;
+                car.specs = specs;
+                car.odometer = odo;
+            } else {
+                const newId = 'car_' + Date.now();
+                state.cars.push({ id: newId, name, specs, odometer: odo, banner: null });
+                state.activeCarId = newId;
+            }
+            saveState();
+            renderAll();
+            closeModal('modal-car');
+            showToast('Vehicle profile saved!');
+        }
+
+        // Tab Navigation with Back Stack
+        function switchTab(tabId, isBack = false) {
+            const currentTab = state.tabHistory[state.tabHistory.length - 1] || 'log';
+            if (!isBack && currentTab !== tabId) {
+                state.tabHistory.push(tabId);
+                if (state.tabHistory.length > 12) state.tabHistory.shift();
+            }
+
+            ['log', 'dents', 'fuel', 'history', 'guides', 'backup'].forEach(t => {
+                document.getElementById('tab-' + t).classList.toggle('hidden', t !== tabId);
+                const nav = document.getElementById('nav-' + t);
+                if (t === tabId) {
+                    nav.className = 'flex flex-col items-center justify-center py-1 rounded-xl text-sky-400 font-extrabold';
+                } else {
+                    nav.className = 'flex flex-col items-center justify-center py-1 rounded-xl text-slate-400 font-semibold';
+                }
+            });
+
+            const headerBack = document.getElementById('header-back-btn');
+            if (tabId !== 'log') {
+                headerBack.classList.remove('hidden');
+            } else {
+                headerBack.classList.add('hidden');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function goBackTab() {
+            if (state.tabHistory.length > 1) {
+                state.tabHistory.pop();
+                const prev = state.tabHistory[state.tabHistory.length - 1] || 'log';
+                switchTab(prev, true);
+            } else {
+                switchTab('log', true);
+            }
+        }
+
+        function toggleTheme() {
+            const root = document.documentElement;
+            root.classList.toggle('dark');
+            document.getElementById('theme-icon').textContent = root.classList.contains('dark') ? '☀️' : '🌙';
+        }
+
+        function openModal(id) {
+            const m = document.getElementById(id);
+            m.classList.remove('hidden');
+            m.classList.add('flex');
+        }
+
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+        }
+
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
